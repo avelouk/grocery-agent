@@ -1,0 +1,15 @@
+[project]
+name = "grocery-agent"
+version = "1.0.0"
+description = "Minimal Browser-Use agent: jumbo.cl, find potatoes, add to cart"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "browser-use",
+    "python-dotenv",
+]
+
+[project.scripts]
+
+[tool.uv]
+dev-dependencies = []
