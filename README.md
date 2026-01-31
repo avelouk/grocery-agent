@@ -18,12 +18,13 @@ uvx browser-use install
 
 ## Configure
 
-Copy env example and set an API key:
+Copy env example and set the model and matching API key (Browser-Use convention):
 
 ```bash
 cp .env.example .env
-# Edit .env: set OPENAI_API_KEY=sk-... (or BROWSER_USE_API_KEY if you use ChatBrowserUse)
 ```
+
+**LLM:** set one in `.env` — `BROWSER_USE_API_KEY` ([get key](https://cloud.browser-use.com/new-api-key)) or `GOOGLE_API_KEY` ([get key](https://aistudio.google.com/app/apikey)). If both are set, Browser-Use is used.
 
 ## Run
 
@@ -34,14 +35,3 @@ uv run run_jumbo.py
 Or with venv active: `python run_jumbo.py`
 
 Browser opens on jumbo.cl; the agent navigates, finds potatoes, and adds them to the cart. Task and site are in `run_jumbo.py` (no vision: `use_vision=False`).
-
-## Optional: ChatBrowserUse
-
-For their recommended model (fast, low cost), get a key at [cloud.browser-use.com](https://cloud.browser-use.com/new-api-key), set `BROWSER_USE_API_KEY` in `.env`, and in `run_jumbo.py` use:
-
-```python
-from browser_use import ChatBrowserUse
-llm = ChatBrowserUse()
-```
-
-instead of `ChatOpenAI`.
