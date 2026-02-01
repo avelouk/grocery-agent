@@ -9,6 +9,7 @@ Browser-Use is used if both are set.
 import asyncio
 import os
 import sys
+from pathlib import Path
 from dotenv import load_dotenv
 
 from browser_use import Agent, Browser, ChatBrowserUse, ChatGoogle
@@ -34,9 +35,33 @@ def get_llm():
     sys.exit(1)
 
 
+def get_browser_executable():
+    """Get browser executable path from env var or auto-detect Ungoogled Chromium."""
+    # Check environment variable first
+    env_path = os.environ.get("BROWSER_EXECUTABLE_PATH")
+    if env_path and Path(env_path).exists():
+        return env_path
+    
+    # Auto-detect Ungoogled Chromium at common macOS location
+    default_path = Path("/Applications/Chromium.app/Contents/MacOS/Chromium")
+    if default_path.exists():
+        return str(default_path)
+    
+    # Return None to use browser-use default
+    return None
+
+
 async def main():
     llm = get_llm()
-    browser = Browser(headless=False, keep_alive=True)
+    browser_kwargs = {
+        "headless": False,
+        "keep_alive": True,
+    }
+    executable_path = get_browser_executable()
+    if executable_path:
+        browser_kwargs["executable_path"] = executable_path
+    
+    browser = Browser(**browser_kwargs)
 
     agent = Agent(
         task=TASK,

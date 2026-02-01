@@ -18,13 +18,18 @@ uvx browser-use install
 
 ## Configure
 
-Copy env example and set the model and matching API key (Browser-Use convention):
+Copy env example and set the required values:
 
 ```bash
 cp .env.example .env
 ```
 
-**LLM:** set one in `.env` — `BROWSER_USE_API_KEY` ([get key](https://cloud.browser-use.com/new-api-key)) or `GOOGLE_API_KEY` ([get key](https://aistudio.google.com/app/apikey)). If both are set, Browser-Use is used.
+**Required:**
+- **LLM:** set one in `.env` — `BROWSER_USE_API_KEY` ([get key](https://cloud.browser-use.com/new-api-key)) or `GOOGLE_API_KEY` ([get key](https://aistudio.google.com/app/apikey)). If both are set, Browser-Use is used.
+- **Jumbo credentials:** `JUMBO_EMAIL` and `JUMBO_PASSWORD`
+
+**Optional:**
+- **Browser:** `BROWSER_EXECUTABLE_PATH` — custom browser executable path (e.g., Ungoogled Chromium). If not set, auto-detects Ungoogled Chromium at `/Applications/Chromium.app/Contents/MacOS/Chromium` on macOS, otherwise uses browser-use default.
 
 ## Run
 
