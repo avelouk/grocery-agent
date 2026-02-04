@@ -17,11 +17,19 @@ uvx browser-use install
 
 ## Configure
 
+Copy env example and set the required values:
+
 ```bash
 cp .env.example .env
 ```
 
-Set one LLM key in `.env`: `BROWSER_USE_API_KEY` or `GOOGLE_API_KEY`. Optional: `GEMINI_MODEL`, `JUMBO_EMAIL`, `JUMBO_PASSWORD`.
+**Required:**
+- **LLM:** set one in `.env` — `BROWSER_USE_API_KEY` ([get key](https://cloud.browser-use.com/new-api-key)) or `GOOGLE_API_KEY` ([get key](https://aistudio.google.com/app/apikey)). If both are set, Browser-Use is used.
+- **Jumbo credentials:** `JUMBO_EMAIL` and `JUMBO_PASSWORD`
+
+**Optional:**
+- **Browser:** `BROWSER_EXECUTABLE_PATH` — custom browser executable path (e.g., Ungoogled Chromium). If not set, auto-detects Ungoogled Chromium at `/Applications/Chromium.app/Contents/MacOS/Chromium` on macOS, otherwise uses browser-use default.
+- `GEMINI_MODEL` — override Gemini model (default: gemini-flash-latest).
 
 ## Run
 

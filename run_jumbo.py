@@ -9,6 +9,7 @@ Browser-Use is used if both are set.
 import asyncio
 import os
 import sys
+from pathlib import Path
 from dotenv import load_dotenv
 
 from browser_use import Agent, Browser
@@ -25,13 +26,43 @@ If the site shows you are logged out or asks you to sign in, log in first: use e
 Find papas and add them to the cart. Then stop."""
 
 
+def get_llm():
+    if os.environ.get("BROWSER_USE_API_KEY"):
+        return ChatBrowserUse()
+    if os.environ.get("GOOGLE_API_KEY"):
+        model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+        return ChatGoogle(model=model)
+    print("Set BROWSER_USE_API_KEY or GOOGLE_API_KEY in .env", file=sys.stderr)
+    sys.exit(1)
+
+
+def get_browser_executable():
+    """Get browser executable path from env var or auto-detect Ungoogled Chromium."""
+    # Check environment variable first
+    env_path = os.environ.get("BROWSER_EXECUTABLE_PATH")
+    if env_path and Path(env_path).exists():
+        return env_path
+    
+    # Auto-detect Ungoogled Chromium at common macOS location
+    default_path = Path("/Applications/Chromium.app/Contents/MacOS/Chromium")
+    if default_path.exists():
+        return str(default_path)
+    
+    # Return None to use browser-use default
+    return None
+
+
 async def main():
     try:
         llm = get_llm()
     except ValueError as e:
         print(e, file=sys.stderr)
         sys.exit(1)
-    browser = Browser(headless=False, keep_alive=True)
+    browser_kwargs = {"headless": False, "keep_alive": True}
+    executable_path = get_browser_executable()
+    if executable_path:
+        browser_kwargs["executable_path"] = executable_path
+    browser = Browser(**browser_kwargs)
 
     agent = Agent(
         task=TASK,
