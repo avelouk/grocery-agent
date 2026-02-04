@@ -3,7 +3,7 @@ Recipe parsing: one LLM call to turn recipe text into a structured Recipe.
 """
 from browser_use.llm.messages import SystemMessage, UserMessage
 
-from grocery_agent.llm import get_llm
+from grocery_agent.llm import get_generic_llm
 from grocery_agent.models import Recipe
 
 SYSTEM_PROMPT = """You extract a recipe from the given text and return it as a structured Recipe.
@@ -27,7 +27,7 @@ async def parse_recipe(text: str) -> Recipe:
     """Turn recipe text into a structured Recipe via one LLM call (structured output)."""
     if not text or not text.strip():
         raise ValueError("Recipe text is empty")
-    llm = get_llm()
+    llm = get_generic_llm()
     messages = [
         SystemMessage(content=SYSTEM_PROMPT),
         UserMessage(content=text.strip()),

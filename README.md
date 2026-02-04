@@ -1,49 +1,61 @@
 # Grocery agent
 
-Recipe ingest (web UI) + jumbo.cl cart (Browser-Use). Small web app: paste recipe or URL → LLM → SQLite → show recipe.
+Web app to ingest recipes and build a grocery list; jumbo.cl browser agent to add items to cart.
 
-## Setup (use uv)
+**Flow:** Paste recipe (or URL) → LLM parses → save to SQLite. Pick recipes for the week → checklist (LLM merges duplicates) → confirm → jumbo bot opens browser and uses the list.
 
-From the repo root:
+---
+
+## Setup
 
 ```bash
 uv venv --python 3.11
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 uv pip install -e .
-
-# For jumbo.cl cart only: install browser
-uvx browser-use install
+uvx browser-use install     # for jumbo cart
 ```
 
 ## Configure
 
-Copy env example and set the required values:
+`cp .env.example .env` then set:
 
-```bash
-cp .env.example .env
-```
+| What | Env var | Notes |
+|------|---------|--------|
+| Jumbo login | `JUMBO_EMAIL`, `JUMBO_PASSWORD` | Required for run_jumbo |
+| Web app (recipes, grocery list) | `GOOGLE_API_KEY` | [Get key](https://aistudio.google.com/app/apikey). Used for structured output. |
+| Jumbo browser agent | `BROWSER_USE_API_KEY` | [Get key](https://cloud.browser-use.com/new-api-key). Preferred for run_jumbo; falls back to Google if unset. |
+| Custom browser | `BROWSER_EXECUTABLE_PATH` | Optional. Default: auto-detect Chromium on macOS. |
 
-**Required:**
-- **LLM:** set one in `.env` — `BROWSER_USE_API_KEY` ([get key](https://cloud.browser-use.com/new-api-key)) or `GOOGLE_API_KEY` ([get key](https://aistudio.google.com/app/apikey)). If both are set, Browser-Use is used.
-- **Jumbo credentials:** `JUMBO_EMAIL` and `JUMBO_PASSWORD`
+**TL;DR:** Set `GOOGLE_API_KEY` for the web app. Set `BROWSER_USE_API_KEY` (or `GOOGLE_API_KEY`) for the jumbo bot. Set both for full flow.
 
-**Optional:**
-- **Browser:** `BROWSER_EXECUTABLE_PATH` — custom browser executable path (e.g., Ungoogled Chromium). If not set, auto-detects Ungoogled Chromium at `/Applications/Chromium.app/Contents/MacOS/Chromium` on macOS, otherwise uses browser-use default.
+---
 
 ## Run
 
-**Web app (recipe ingest):**
+**Web app** — recipe ingest + grocery list:
 
 ```bash
 uv run start
 ```
 
-Then open http://localhost:8000 — paste recipe text or a recipe URL, submit; the app fetches (if URL), calls the LLM once, saves to SQLite (`data/grocery.db`), and shows the structured recipe.
+Open http://localhost:8000. Ingest recipes (paste text or URL), then use **Grocery list** to pick recipes, set portions, and get a checklist. **Confirm and add to cart** writes the list to `data/grocery_list.json` and starts the jumbo bot (logs appear in the same terminal).
 
-**Jumbo.cl cart:**
+**Jumbo bot only** (e.g. for testing):
 
 ```bash
 uv run run_jumbo.py
 ```
 
-Browser opens on jumbo.cl; the agent finds potatoes and adds them to the cart (no vision).
+Browser opens on jumbo.cl; agent logs in and runs the task. With a list from the web app, it reads `data/grocery_list.json`.
+
+---
+
+## Grocery list output (for jumbo agent)
+
+The list is normalized and flattened. Each item: `name`, `amount_str`, `form`, `category`, `optional`, `pantry_item`. Example: `{"name": "Potato", "amount_str": "3 medium + 2 lb", "form": "fresh", ...}`.
+
+**Get the list:**
+
+- **Python:** `from grocery_agent.grocery_list import get_grocery_list` → `items = await get_grocery_list(recipe_ids=[1,2], portions_override={1:4}, selected_indices=[0,1])`. Sync: `get_grocery_list_sync(...)`.
+- **CLI:** `uv run python -m grocery_agent.grocery_list 1 2 --portions 1=4 --selected 0 1`
+- **HTTP:** `GET /api/grocery-list?ids=1,2&portion_1=4&selected=0,1` → `{"items": [...]}`

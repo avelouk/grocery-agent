@@ -171,13 +171,17 @@ async def normalize_ingredients_with_llm(flat_list: list[dict]) -> list[dict]:
     flat_list: list of dicts with at least "name", "unit" (and optionally "form").
     Returns list of {"name": str, "unit": str} in the same order. On failure returns empty list
     (caller should fall back to static normalizer).
+
+    Uses get_generic_llm() (Google/Gemini) so structured output is supported.
+    On failure (no GOOGLE_API_KEY or API error) returns [] and caller uses static normalizer.
     """
     if not flat_list:
         return []
     try:
         from browser_use.llm.messages import SystemMessage, UserMessage
-        from grocery_agent.llm import get_llm
+        from grocery_agent.llm import get_generic_llm
 
+        llm = get_generic_llm()
         lines = []
         for row in flat_list:
             name = (row.get("name") or "").strip()
@@ -185,7 +189,6 @@ async def normalize_ingredients_with_llm(flat_list: list[dict]) -> list[dict]:
             lines.append(f"- {name} | {unit}")
         user_content = "Normalize these ingredients (one per line). Output the list in the SAME ORDER.\n\n" + "\n".join(lines)
 
-        llm = get_llm()
         messages = [
             SystemMessage(content=NORMALIZE_SYSTEM_PROMPT),
             UserMessage(content=user_content),
