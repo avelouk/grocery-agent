@@ -140,3 +140,14 @@ def recipe_from_row(
         instructions=row["instructions"],
         source_url=row["source_url"],
     )
+
+
+def list_recipes(conn: sqlite3.Connection) -> list[dict]:
+    """Return all saved recipes as [{id, name, portions}, ...] for the grocery-list picker."""
+    rows = conn.execute(
+        "SELECT id, name, portions FROM recipes ORDER BY name"
+    ).fetchall()
+    return [
+        {"id": r["id"], "name": r["name"], "portions": float(r["portions"]) if r["portions"] is not None else 4}
+        for r in rows
+    ]

@@ -9,8 +9,15 @@ from fastapi.templating import Jinja2Templates
 
 import httpx
 
-from grocery_agent.db import get_connection, init_db, insert_recipe, recipe_from_row
+from grocery_agent.db import get_connection, init_db, insert_recipe, list_recipes, recipe_from_row
 from grocery_agent.fetch import fetch_recipe_text
+from grocery_agent.ingredient_normalizer import (
+    normalize_ingredients_with_llm,
+    normalize_name_for_display,
+    normalize_name_for_key,
+    normalize_unit_for_key,
+)
+from grocery_agent.models import Recipe
 from grocery_agent.recipe import parse_recipe
 
 # Init DB on startup (creates data/grocery.db and tables if missing)
@@ -25,6 +32,185 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 async def index(request: Request):
     """Form: paste recipe text or paste recipe URL."""
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/list", response_class=HTMLResponse)
+async def list_page(request: Request):
+    """Step 1: Pick recipes for the week (from saved or paste link/text to ingest)."""
+    conn = get_connection()
+    try:
+        recipes = list_recipes(conn)
+    finally:
+        conn.close()
+    return templates.TemplateResponse(
+        "list.html",
+        {"request": request, "recipes": recipes},
+    )
+
+
+@app.post("/list", response_class=HTMLResponse)
+async def list_submit(
+    request: Request,
+    recipe_ids: list[int] = Form(default=[]),
+    url: str | None = Form(None),
+    text: str | None = Form(None),
+):
+    """
+    Step 1 submit: optional new recipe via url/text (ingest then add id), then redirect to checklist.
+    recipe_ids from checkboxes: Form sends as repeated keys or single int when one selected.
+    """
+    if isinstance(recipe_ids, list):
+        ids = [int(x) for x in recipe_ids if x is not None]
+    elif recipe_ids is not None:
+        ids = [int(recipe_ids)]
+    else:
+        ids = []
+    if url and url.strip():
+        try:
+            recipe_text = await fetch_recipe_text(url.strip())
+        except Exception:
+            conn = get_connection()
+            try:
+                recipes = list_recipes(conn)
+            finally:
+                conn.close()
+            return templates.TemplateResponse(
+                "list.html",
+                {"request": request, "recipes": recipes, "error": "Could not fetch URL. Try pasting text."},
+            )
+        try:
+            recipe = await parse_recipe(recipe_text)
+        except ValueError as e:
+            conn = get_connection()
+            recipes = list_recipes(conn)
+            conn.close()
+            return templates.TemplateResponse(
+                "list.html",
+                {"request": request, "recipes": recipes, "error": str(e)},
+            )
+        recipe.source_url = url.strip()
+        conn = get_connection()
+        try:
+            new_id = insert_recipe(conn, recipe)
+            conn.commit()
+            ids.append(new_id)
+        finally:
+            conn.close()
+    elif text and text.strip():
+        try:
+            recipe = await parse_recipe(text.strip())
+        except ValueError as e:
+            conn = get_connection()
+            recipes = list_recipes(conn)
+            conn.close()
+            return templates.TemplateResponse(
+                "list.html",
+                {"request": request, "recipes": recipes, "error": str(e)},
+            )
+        conn = get_connection()
+        try:
+            new_id = insert_recipe(conn, recipe)
+            conn.commit()
+            ids.append(new_id)
+        finally:
+            conn.close()
+    if not ids:
+        conn = get_connection()
+        try:
+            recipes = list_recipes(conn)
+        finally:
+            conn.close()
+            return templates.TemplateResponse(
+                "list.html",
+                {"request": request, "recipes": recipes, "error": "Select at least one recipe or add one by link/text."},
+            )
+    form = await request.form()
+    portion_qs = []
+    for rid in ids:
+        raw = form.get(f"portion_{rid}")
+        if raw is not None and str(raw).strip():
+            try:
+                p = max(1, int(float(str(raw).strip())))
+                portion_qs.append(f"portion_{rid}={p}")
+            except (ValueError, TypeError):
+                pass
+    query = "&".join([f"ids={','.join(map(str, ids))}"] + portion_qs)
+    return RedirectResponse(url=f"/list/checklist?{query}", status_code=303)
+
+
+@app.get("/list/checklist", response_class=HTMLResponse)
+async def checklist_page(request: Request, ids: str = ""):
+    """
+    Step 2 & 3: Aggregated ingredient checklist.
+    Default: pantry items unchecked (won't order), weekly items checked (will order).
+    User marks pantry items they need to restock.
+    Portions per recipe: use query portion_1=4, portion_2=6 etc.; else recipe default.
+    """
+    recipe_ids = [int(x.strip()) for x in ids.split(",") if x.strip()]
+    if not recipe_ids:
+        return RedirectResponse(url="/list", status_code=302)
+    portions_override = {}
+    for rid in recipe_ids:
+        raw = request.query_params.get(f"portion_{rid}")
+        if raw is not None and str(raw).strip():
+            try:
+                portions_override[rid] = max(1, int(float(str(raw).strip())))
+            except (ValueError, TypeError):
+                pass
+    conn = get_connection()
+    try:
+        recipes = []
+        for rid in recipe_ids:
+            r = recipe_from_row(conn, rid)
+            if r:
+                if rid in portions_override:
+                    r.portions = portions_override[rid]
+                recipes.append(r)
+    finally:
+        conn.close()
+    if not recipes:
+        return RedirectResponse(url="/list", status_code=302)
+    flat = _flat_ingredients(recipes)
+    canonical_list = await normalize_ingredients_with_llm(flat)
+    ingredients_display = _merge_flat_ingredients(flat, canonical_list)
+    recipe_portions = [(recipe_ids[i], int(recipes[i].portions)) for i in range(len(recipe_ids))]
+    return templates.TemplateResponse(
+        "checklist.html",
+        {
+            "request": request,
+            "recipe_ids": recipe_ids,
+            "recipes": recipes,
+            "recipe_portions": recipe_portions,
+            "ingredients_display": ingredients_display,
+        },
+    )
+
+
+@app.post("/list/confirm", response_class=HTMLResponse)
+async def list_confirm(request: Request, recipe_ids: str = Form("")):
+    """
+    Step 4 placeholder: user confirmed which items to order.
+    TODO: pass selected items to jumbo cart bot.
+    """
+    form = await request.form()
+    ids_str = (recipe_ids or "").strip()
+    recipe_id_list = [int(x.strip()) for x in ids_str.split(",") if x.strip()]
+    raw = form.getlist("item_index")
+    selected_indices = [int(x) for x in raw if x is not None and str(x).strip().isdigit()]
+    portions_qs = "&".join(
+        f"portion_{rid}={form.get(f'portion_{rid}')}" for rid in recipe_id_list if form.get(f"portion_{rid}") is not None
+    )
+    return templates.TemplateResponse(
+        "confirm.html",
+        {
+            "request": request,
+            "recipe_ids": recipe_id_list,
+            "recipe_ids_str": ",".join(map(str, recipe_id_list)),
+            "portions_qs": portions_qs,
+            "selected_count": len(selected_indices),
+            "message": "Add to cart (jumbo) is the next step.",
+        },
+    )
 
 
 @app.post("/ingest")
@@ -79,6 +265,100 @@ def run() -> None:
     """Run the web app (uv run start)."""
     import uvicorn
     uvicorn.run("grocery_agent.web:app", host="0.0.0.0", port=8000, reload=True)
+
+
+def _format_amount(total_quantity: float | None, unit: str | None) -> str:
+    """Format total quantity + unit for display (e.g. '3 cups', 'to taste')."""
+    if total_quantity is None:
+        return (unit or "to taste").strip()
+    if total_quantity == int(total_quantity):
+        num_str = str(int(total_quantity))
+    else:
+        num_str = f"{total_quantity:.2g}".rstrip("0").rstrip(".")
+    return f"{num_str} {unit or ''}".strip()
+
+
+def _flat_ingredients(recipes: list[Recipe]) -> list[dict]:
+    """Build a flat list of ingredient rows (one per recipe ingredient) with portions applied."""
+    flat = []
+    for recipe in recipes:
+        portions = recipe.portions or 4
+        if portions <= 0:
+            portions = 4
+        for ing in recipe.ingredients:
+            qpp = ing.quantity_per_portion
+            total = (qpp * portions) if qpp is not None else None
+            form_val = getattr(ing.form, "value", str(ing.form))
+            flat.append({
+                "name": (ing.name or "").strip(),
+                "unit": (ing.unit or "").strip() or "",
+                "form": form_val if isinstance(form_val, str) else getattr(form_val, "value", "fresh"),
+                "total": total,
+                "pantry_item": getattr(ing, "pantry_item", False),
+                "optional": getattr(ing, "optional", False),
+                "category": ing.category.value,
+            })
+    return flat
+
+
+def _merge_flat_ingredients(
+    flat: list[dict],
+    canonical_list: list[dict] | None,
+) -> list[dict]:
+    """
+    Merge flat ingredient rows by (canonical name, form) only. Same ingredient with different
+    units (e.g. "3 medium" and "2 lb" of potato) become one line: "3 medium + 2 lb".
+    Same unit is summed (e.g. 2 tbsp + 1 tbsp -> 3 tbsp). The grocery agent interprets the combined string.
+    """
+    def name_key_for(i: int) -> str:
+        row = flat[i]
+        if canonical_list and i < len(canonical_list):
+            c = canonical_list[i]
+            return (c.get("name") or "").strip().lower() or normalize_name_for_key(row["name"])
+        return normalize_name_for_key(row["name"])
+
+    # (name_key, form) -> (list of (total, unit), all_pantry, any_optional, category)
+    merged: dict[tuple, tuple[list[tuple[float | None, str]], bool, bool, str]] = {}
+    for i, row in enumerate(flat):
+        k = (name_key_for(i), row["form"])
+        total = row["total"]
+        disp_unit = (row["unit"] or "").strip() or ""
+        if canonical_list and i < len(canonical_list):
+            disp_unit = (canonical_list[i].get("unit") or "").strip().lower() or disp_unit
+        disp_unit = normalize_unit_for_key(disp_unit) or disp_unit
+        if k not in merged:
+            merged[k] = ([(total, disp_unit)], row["pantry_item"], row["optional"], row["category"])
+        else:
+            amounts, all_pantry, any_opt, cat = merged[k]
+            # Collapse same unit: if we already have an entry with this unit, sum; else append
+            unit_norm = normalize_unit_for_key(disp_unit)
+            found = False
+            for j, (t, u) in enumerate(amounts):
+                if normalize_unit_for_key(u) == unit_norm:
+                    if t is not None and total is not None:
+                        amounts[j] = (t + total, u)
+                    elif total is not None:
+                        amounts[j] = (total, u)
+                    found = True
+                    break
+            if not found:
+                amounts.append((total, disp_unit))
+            merged[k] = (amounts, all_pantry and row["pantry_item"], any_opt or row["optional"], cat)
+    out = []
+    for idx, ((name_key, form_val), (amounts, pantry_item, optional, category)) in enumerate(sorted(merged.items(), key=lambda x: (x[0][1], x[0][0]))):
+        display_name = normalize_name_for_display(name_key)
+        amount_str = " + ".join(_format_amount(t, u) for t, u in amounts)
+        out.append({
+            "index": idx,
+            "name": display_name,
+            "unit": None,
+            "form": form_val,
+            "amount_str": amount_str,
+            "pantry_item": pantry_item,
+            "optional": optional,
+            "category": category,
+        })
+    return out
 
 
 def _format_scaled_amount(quantity_per_portion: float | None, unit: str | None, servings: int) -> str:

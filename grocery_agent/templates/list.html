@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What to cook this week – Grocery Agent</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    a { color: #06c; }
+    .nav { margin-bottom: 1.5rem; font-size: 0.9rem; }
+    label { display: block; margin-top: 0.75rem; cursor: pointer; }
+    input[type="checkbox"] { margin-right: 0.5rem; }
+    .recipes { margin: 1rem 0; padding-left: 0; list-style: none; }
+    .recipes li { padding: 0.35rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+    .recipes li label { margin-top: 0; flex: 1; }
+    .recipes li .portions { width: 4ch; padding: 0.25rem; }
+    .add-recipe { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #ddd; }
+    .add-recipe label { font-weight: 500; }
+    input[type="url"], textarea { width: 100%; padding: 0.5rem; box-sizing: border-box; }
+    textarea { min-height: 80px; resize: vertical; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; cursor: pointer; }
+    .error { color: #c00; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <nav class="nav"><a href="/">Ingest recipe</a> · <strong>Grocery list</strong></nav>
+  <h1>What do you want to cook this week?</h1>
+  <p>Select saved recipes and/or add one by link or pasted text. Then generate your grocery list.</p>
+  <form method="post" action="/list">
+    {% if recipes %}
+    <p><strong>Saved recipes</strong></p>
+    <ul class="recipes">
+      {% for r in recipes %}
+      <li>
+        <label>
+          <input type="checkbox" name="recipe_ids" value="{{ r.id }}">
+          {{ r.name }}
+        </label>
+        <span>Portions:</span>
+        <input type="number" name="portion_{{ r.id }}" value="{{ r.portions | int }}" min="1" max="99" class="portions" title="Portions for this recipe">
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="meta">No saved recipes yet. <a href="/">Ingest a recipe</a> first, or add one below.</p>
+    {% endif %}
+    <div class="add-recipe">
+      <p><strong>Add a new recipe</strong></p>
+      <label for="url">Recipe URL (optional)</label>
+      <input type="url" id="url" name="url" placeholder="https://...">
+      <label for="text">Or paste recipe text</label>
+      <textarea id="text" name="text" placeholder="Paste recipe here..."></textarea>
+    </div>
+    <button type="submit">Generate grocery list</button>
+  </form>
+  {% if error %}
+  <p class="error">{{ error }}</p>
+  {% endif %}
+</body>
+</html>

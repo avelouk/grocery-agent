@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grocery list – Grocery Agent</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    a { color: #06c; }
+    .nav { margin-bottom: 1rem; font-size: 0.9rem; }
+    .meta { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+    ul.ingredients { list-style: none; padding: 0; }
+    ul.ingredients li { padding: 0.4rem 0; border-bottom: 1px solid #eee; display: flex; align-items: baseline; gap: 0.5rem; }
+    ul.ingredients input[type="checkbox"] { flex-shrink: 0; cursor: pointer; }
+    .amount { min-width: 5rem; color: #444; }
+    .optional { color: #888; font-style: italic; }
+    .category { color: #666; font-size: 0.85rem; }
+    .pantry { color: #666; font-size: 0.85rem; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; cursor: pointer; }
+    .back { margin-top: 1.5rem; }
+  </style>
+</head>
+<body>
+  <nav class="nav"><a href="/">Ingest</a> · <a href="/list">Grocery list</a> · <strong>Checklist</strong></nav>
+  <h1>Your grocery list</h1>
+  <p class="meta">Recipes: {% for r in recipes %}{{ r.name }} ({{ r.portions | int }} portions){% if not loop.last %}; {% endif %}{% endfor %}</p>
+  <p class="meta">Items <strong>checked</strong> will be ordered. By default, pantry items (likely have at home) are unchecked — check any you need to restock.</p>
+  <form method="post" action="/list/confirm" id="checklist-form">
+    <input type="hidden" name="recipe_ids" value="{{ recipe_ids | join(',') }}">
+    {% for rid, portion in recipe_portions %}
+    <input type="hidden" name="portion_{{ rid }}" value="{{ portion }}">
+    {% endfor %}
+    <ul class="ingredients">
+      {% for ing in ingredients_display %}
+      <li>
+        <input type="checkbox" name="item_index" value="{{ ing.index }}" id="item_{{ ing.index }}"
+               {{ 'checked' if not ing.pantry_item else '' }}>
+        <label for="item_{{ ing.index }}" class="amount">{{ ing.amount_str }}</label>
+        <span>{{ ing.name }}{% if ing.optional %} <span class="optional">(optional)</span>{% endif %}</span>
+        <span class="category">({{ ing.category }})</span>
+        <span class="pantry">{% if ing.pantry_item %}pantry{% else %}weekly{% endif %} · {{ ing.form }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    <button type="submit">Confirm and add to cart</button>
+  </form>
+  <p class="back"><a href="/list">Change recipes</a></p>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirm – Grocery Agent</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    a { color: #06c; }
+    .nav { margin-bottom: 1rem; font-size: 0.9rem; }
+    .meta { color: #666; margin-top: 1rem; }
+    .back { margin-top: 1.5rem; }
+  </style>
+</head>
+<body>
+  <nav class="nav"><a href="/">Ingest</a> · <a href="/list">Grocery list</a> · <strong>Confirm</strong></nav>
+  <h1>Confirm</h1>
+  <p>You selected <strong>{{ selected_count }}</strong> item(s) to order.</p>
+  <p class="meta">{{ message }}</p>
+  <p class="back"><a href="/list/checklist?ids={{ recipe_ids_str }}{% if portions_qs %}&{{ portions_qs }}{% endif %}">Back to checklist</a> · <a href="/list">Change recipes</a></p>
+</body>
+</html>
