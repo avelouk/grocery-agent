@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grocery Agent – Ingest recipe</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    label { display: block; margin-top: 1rem; font-weight: 500; }
+    input[type="url"], textarea { width: 100%; padding: 0.5rem; box-sizing: border-box; }
+    textarea { min-height: 120px; resize: vertical; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; cursor: pointer; }
+    .error { color: #c00; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Ingest recipe</h1>
+  <p>Paste recipe text or a link to a recipe. The bot will extract it and save it.</p>
+  <form method="post" action="/ingest">
+    <label for="url">Recipe URL (optional)</label>
+    <input type="url" id="url" name="url" placeholder="https://...">
+    <label for="text">Or paste recipe text</label>
+    <textarea id="text" name="text" placeholder="Paste recipe here..."></textarea>
+    <button type="submit">Ingest</button>
+  </form>
+  {% if error %}
+  <p class="error">{{ error }}</p>
+  {% endif %}
+</body>
+</html>

@@ -1,2 +1,7 @@
 browser-use
+fastapi
+httpx
+jinja2
 python-dotenv
+trafilatura
+uvicorn[standard]

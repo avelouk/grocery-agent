@@ -1,0 +1,2 @@
+[console_scripts]
+start = grocery_agent.web:run

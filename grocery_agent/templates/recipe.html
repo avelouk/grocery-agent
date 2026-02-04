@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ recipe.name }} – Grocery Agent</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.5rem; }
+    a { color: #06c; }
+    .meta { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+    ul.ingredients { list-style: none; padding: 0; }
+    ul.ingredients li { padding: 0.2rem 0; border-bottom: 1px solid #eee; }
+    .category { color: #666; font-size: 0.85rem; }
+    .instructions { white-space: pre-wrap; margin-top: 1rem; }
+    .back { margin-top: 1.5rem; }
+  </style>
+</head>
+<body>
+  <h1>{{ recipe.name }}</h1>
+  {% if recipe.source_url %}
+  <p class="meta"><a href="{{ recipe.source_url }}" target="_blank" rel="noopener">Source</a></p>
+  {% endif %}
+  <form method="get" action="/recipe/{{ recipe_id }}" class="servings-form" style="margin-bottom: 1rem;">
+    <label for="servings">Servings:</label>
+    <input type="number" id="servings" name="servings" value="{{ servings }}" min="1" max="99" style="width: 4ch;">
+    <button type="submit">Update</button>
+  </form>
+  <h2>Ingredients</h2>
+  <ul class="ingredients">
+    {% for ing in ingredients_display %}
+    <li>
+      {{ ing.amount_str }} {{ ing.name }}
+      <span class="category">({{ ing.category.value }})</span>
+    </li>
+    {% endfor %}
+  </ul>
+  <h2>Instructions</h2>
+  <div class="instructions">{{ recipe.instructions }}</div>
+  <p class="back"><a href="/">Ingest another recipe</a></p>
+</body>
+</html>
