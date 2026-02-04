@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
-from grocery_agent.models import Ingredient, IngredientCategory, Recipe
+from grocery_agent.models import Ingredient, IngredientCategory, IngredientForm, Recipe
 from grocery_agent.quantity_parser import parse_quantity
 
 # Default DB path: project root / data / grocery.db
@@ -54,6 +54,9 @@ def _create_tables(conn: sqlite3.Connection) -> None:
             quantity_per_portion REAL,
             unit TEXT,
             category TEXT NOT NULL DEFAULT 'other',
+            optional INTEGER NOT NULL DEFAULT 0,
+            pantry_item INTEGER NOT NULL DEFAULT 0,
+            form TEXT NOT NULL DEFAULT 'fresh',
             UNIQUE(recipe_id, name)
         )
     """)
@@ -78,9 +81,13 @@ def insert_recipe(conn: sqlite3.Connection, recipe: Recipe) -> int:
         else:
             quantity_per_portion = None
             unit = (ing.unit or "to taste").strip() or "to taste"
+        optional = 1 if getattr(ing, "optional", False) else 0
+        pantry_item = 1 if getattr(ing, "pantry_item", False) else 0
+        form_val = getattr(ing, "form", IngredientForm.FRESH)
+        form_str = form_val.value if hasattr(form_val, "value") else str(form_val)
         conn.execute(
-            "INSERT INTO recipe_ingredients (recipe_id, name, quantity_per_portion, unit, category) VALUES (?, ?, ?, ?, ?)",
-            (recipe_id, ing.name, quantity_per_portion, unit, ing.category.value),
+            "INSERT INTO recipe_ingredients (recipe_id, name, quantity_per_portion, unit, category, optional, pantry_item, form) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (recipe_id, ing.name, quantity_per_portion, unit, ing.category.value, optional, pantry_item, form_str),
         )
     return recipe_id
 
@@ -97,7 +104,7 @@ def recipe_from_row(
         return None
     portions = float(row["portions"]) if row["portions"] is not None else 4
     ing_rows = conn.execute(
-        "SELECT name, quantity_per_portion, unit, category FROM recipe_ingredients WHERE recipe_id = ? ORDER BY id",
+        "SELECT name, quantity_per_portion, unit, category, optional, pantry_item, form FROM recipe_ingredients WHERE recipe_id = ? ORDER BY id",
         (recipe_id,),
     ).fetchall()
     ingredients = []
@@ -107,6 +114,13 @@ def recipe_from_row(
             qpp = float(qpp) if qpp is not None else None
         except (TypeError, ValueError):
             qpp = None
+        optional = bool(r["optional"]) if "optional" in r.keys() else False
+        pantry_item = bool(r["pantry_item"]) if "pantry_item" in r.keys() else False
+        form_str = r["form"] if "form" in r.keys() and r["form"] else "fresh"
+        try:
+            form_enum = IngredientForm(form_str)
+        except ValueError:
+            form_enum = IngredientForm.FRESH
         ingredients.append(
             Ingredient(
                 name=r["name"],
@@ -114,6 +128,9 @@ def recipe_from_row(
                 unit=r["unit"] or None,
                 category=IngredientCategory(r["category"]),
                 quantity_per_portion=qpp,
+                optional=optional,
+                pantry_item=pantry_item,
+                form=form_enum,
             )
         )
     return Recipe(

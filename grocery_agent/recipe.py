@@ -16,6 +16,9 @@ Rules:
   - quantity: A single number or fraction only (e.g. "2", "1/2", "1 1/2", "70"). For "to taste", "pinch", "some" leave quantity null/empty.
   - unit: A single unit only: standard (cups, tbsp, g, ml, etc.) or qualitative ("to taste", "pinch"). Do NOT put numbers or extra text in unit (e.g. use quantity=70, unit="g" not unit="tbsp (70)" or "5 tbsp").
   - category: One of pantry, dairy, produce, meat, seafood, spice, condiment, frozen, other.
+  - optional: Set true if the recipe says the ingredient is optional (e.g. "optional: parsley", "garnish (optional)", "or omit").
+  - pantry_item: Set true for things people typically keep stocked (dry pasta, rice, oil, flour, spices, canned tomatoes, salt, sugar). Set false for things usually bought weekly (fresh meat, fresh produce, dairy, fresh herbs).
+  - form: How the recipe specifies the ingredient – one of: fresh, canned, frozen, dried, liquid. Use "canned" for canned beans/tomatoes, "frozen" for frozen peas/corn, "dried" for dried pasta/herbs/lentils, "liquid" for oil/vinegar, "fresh" for fresh produce/meat/dairy unless the recipe says otherwise.
 - instructions: Full cooking instructions as plain text.
 - source_url: Leave null unless the text explicitly states a URL or you are given a URL."""
 

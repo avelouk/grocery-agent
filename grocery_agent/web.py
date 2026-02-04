@@ -115,6 +115,9 @@ async def show_recipe(request: Request, recipe_id: int, servings: int = 4):
             "name": ing.name,
             "category": ing.category,
             "amount_str": _format_scaled_amount(ing.quantity_per_portion, ing.unit, servings),
+            "optional": getattr(ing, "optional", False),
+            "pantry_item": getattr(ing, "pantry_item", False),
+            "form": getattr(ing, "form", None),
         }
         for ing in recipe.ingredients
     ]

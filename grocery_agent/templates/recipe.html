@@ -12,6 +12,7 @@
     ul.ingredients { list-style: none; padding: 0; }
     ul.ingredients li { padding: 0.2rem 0; border-bottom: 1px solid #eee; }
     .category { color: #666; font-size: 0.85rem; }
+    .optional { color: #888; font-style: italic; }
     .instructions { white-space: pre-wrap; margin-top: 1rem; }
     .back { margin-top: 1.5rem; }
   </style>
@@ -27,11 +28,13 @@
     <button type="submit">Update</button>
   </form>
   <h2>Ingredients</h2>
+  <p class="meta">Pantry = likely have at home. Weekly = need to buy. Form = for cart search (fresh/canned/frozen/dried/liquid).</p>
   <ul class="ingredients">
     {% for ing in ingredients_display %}
-    <li>
-      {{ ing.amount_str }} {{ ing.name }}
+    <li class="{{ 'optional' if ing.optional else '' }}">
+      {{ ing.amount_str }} {{ ing.name }}{% if ing.optional %} <span class="optional">(optional)</span>{% endif %}
       <span class="category">({{ ing.category.value }})</span>
+      <span class="meta">{% if ing.pantry_item %}pantry{% else %}weekly{% endif %} · {{ ing.form.value if ing.form else 'fresh' }}</span>
     </li>
     {% endfor %}
   </ul>

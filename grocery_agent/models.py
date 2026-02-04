@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 
 
 class IngredientCategory(str, Enum):
-    """Broad category for an ingredient (helps with pantry vs perishable, substitutes)."""
-    PANTRY = "pantry"       # long-lasting: oil, flour, salt, canned
+    """Broad category for an ingredient (helps with substitutes, etc.)."""
+    PANTRY = "pantry"
     DAIRY = "dairy"
     PRODUCE = "produce"
     MEAT = "meat"
@@ -19,6 +19,15 @@ class IngredientCategory(str, Enum):
     CONDIMENT = "condiment"
     FROZEN = "frozen"
     OTHER = "other"
+
+
+class IngredientForm(str, Enum):
+    """Form of the ingredient as specified in the recipe – for the cart agent (search 'frozen peas' not 'peas')."""
+    FRESH = "fresh"
+    CANNED = "canned"
+    FROZEN = "frozen"
+    DRIED = "dried"
+    LIQUID = "liquid"
 
 
 class Ingredient(BaseModel):
@@ -32,6 +41,11 @@ class Ingredient(BaseModel):
     )
     # Set when loading from DB or after computing from quantity/portions; used for display with scaling
     quantity_per_portion: Optional[float] = Field(None, description="Numeric amount per 1 portion; null for 'to taste' etc.")
+    optional: bool = Field(False, description="True if the ingredient is optional (e.g. garnish, optional add-in)")
+    # Likely have at home (dry pasta, oil, spices, canned) vs need to buy weekly (meat, fresh produce, dairy)
+    pantry_item: bool = Field(False, description="True if typically kept in pantry/long-lasting; false if bought weekly (fresh meat, produce, dairy)")
+    # Form for the cart agent: fresh, canned, frozen, dried, liquid (as recipe specifies)
+    form: IngredientForm = Field(IngredientForm.FRESH, description="Form of ingredient: fresh, canned, frozen, dried, or liquid")
 
 
 class Recipe(BaseModel):
