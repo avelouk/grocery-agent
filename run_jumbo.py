@@ -25,17 +25,6 @@ TASK = f"""Go to {SITE}.
 If the site shows you are logged out or asks you to sign in, log in first: use email "{EMAIL}" and password "{PASSWORD}". Then continue.
 Find papas and add them to the cart. Then stop."""
 
-
-def get_llm():
-    if os.environ.get("BROWSER_USE_API_KEY"):
-        return ChatBrowserUse()
-    if os.environ.get("GOOGLE_API_KEY"):
-        model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
-        return ChatGoogle(model=model)
-    print("Set BROWSER_USE_API_KEY or GOOGLE_API_KEY in .env", file=sys.stderr)
-    sys.exit(1)
-
-
 def get_browser_executable():
     """Get browser executable path from env var or auto-detect Ungoogled Chromium."""
     # Check environment variable first

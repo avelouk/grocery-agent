@@ -29,7 +29,6 @@ cp .env.example .env
 
 **Optional:**
 - **Browser:** `BROWSER_EXECUTABLE_PATH` — custom browser executable path (e.g., Ungoogled Chromium). If not set, auto-detects Ungoogled Chromium at `/Applications/Chromium.app/Contents/MacOS/Chromium` on macOS, otherwise uses browser-use default.
-- `GEMINI_MODEL` — override Gemini model (default: gemini-flash-latest).
 
 ## Run
 
