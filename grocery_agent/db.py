@@ -28,11 +28,13 @@ def init_db(conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] =
         conn = get_connection(db_path)
         try:
             _create_tables(conn)
+            _ensure_image_url_column(conn)
             conn.commit()
         finally:
             conn.close()
     else:
         _create_tables(conn)
+        _ensure_image_url_column(conn)
 
 
 def _create_tables(conn: sqlite3.Connection) -> None:
@@ -63,11 +65,19 @@ def _create_tables(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe_id ON recipe_ingredients(recipe_id)")
 
 
+def _ensure_image_url_column(conn: sqlite3.Connection) -> None:
+    """Add image_url column to recipes if missing (for existing DBs)."""
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(recipes)").fetchall()]
+    if "image_url" not in cols:
+        conn.execute("ALTER TABLE recipes ADD COLUMN image_url TEXT")
+
+
 def insert_recipe(conn: sqlite3.Connection, recipe: Recipe) -> int:
     """Insert a Recipe and its ingredients; return recipe id. Computes quantity_per_portion from quantity and portions."""
+    image_url = getattr(recipe, "image_url", None) or None
     cur = conn.execute(
-        "INSERT INTO recipes (name, instructions, source_url, portions) VALUES (?, ?, ?, ?)",
-        (recipe.name, recipe.instructions, recipe.source_url, recipe.portions),
+        "INSERT INTO recipes (name, instructions, source_url, portions, image_url) VALUES (?, ?, ?, ?, ?)",
+        (recipe.name, recipe.instructions, recipe.source_url, recipe.portions, image_url),
     )
     recipe_id = cur.lastrowid
     portions = recipe.portions or 4
@@ -149,7 +159,7 @@ def recipe_from_row(
 ) -> Optional[Recipe]:
     """Load a Recipe by id with its ingredients (quantity_per_portion and unit from DB)."""
     row = conn.execute(
-        "SELECT id, name, instructions, source_url, portions FROM recipes WHERE id = ?",
+        "SELECT id, name, instructions, source_url, portions, image_url FROM recipes WHERE id = ?",
         (recipe_id,),
     ).fetchone()
     if not row:
@@ -191,15 +201,19 @@ def recipe_from_row(
         ingredients=ingredients,
         instructions=row["instructions"],
         source_url=row["source_url"],
+        image_url=row["image_url"] if "image_url" in row.keys() and row["image_url"] else None,
     )
 
 
 def list_recipes(conn: sqlite3.Connection) -> list[dict]:
-    """Return all saved recipes as [{id, name, portions}, ...] for the grocery-list picker."""
+    """Return all saved recipes as [{id, name, portions, image_url?}, ...] for the grocery-list picker."""
     rows = conn.execute(
-        "SELECT id, name, portions FROM recipes ORDER BY name"
+        "SELECT id, name, portions, image_url FROM recipes ORDER BY name"
     ).fetchall()
-    return [
-        {"id": r["id"], "name": r["name"], "portions": float(r["portions"]) if r["portions"] is not None else 4}
-        for r in rows
-    ]
+    result = []
+    for r in rows:
+        rec = {"id": r["id"], "name": r["name"], "portions": float(r["portions"]) if r["portions"] is not None else 4}
+        if "image_url" in r.keys() and r["image_url"]:
+            rec["image_url"] = r["image_url"]
+        result.append(rec)
+    return result

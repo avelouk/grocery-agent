@@ -55,3 +55,4 @@ class Recipe(BaseModel):
     ingredients: list[Ingredient] = Field(default_factory=list, description="List of ingredients")
     instructions: str = Field(..., description="Cooking instructions (plain text or steps)")
     source_url: Optional[str] = Field(None, description="URL of the recipe if from a link")
+    image_url: Optional[str] = Field(None, description="URL of the main recipe image (scraped from source)")

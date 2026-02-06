@@ -2,6 +2,9 @@
 {% block title %}{{ recipe.name }} – Grocery Agent{% endblock %}
 {% block content %}
   <nav class="nav"><a href="/">← Recipes</a></nav>
+  {% if recipe.image_url %}
+  <p style="margin: 0 0 0.75rem 0;"><img src="{{ recipe.image_url }}" alt="" style="max-width: 100%; height: auto; border: var(--pixel) solid var(--border); border-radius: var(--radius);" loading="lazy" referrerpolicy="no-referrer"></p>
+  {% endif %}
   <h1>{{ recipe.name }}</h1>
   {% if recipe.source_url %}
   <p class="muted"><a href="{{ recipe.source_url }}" target="_blank" rel="noopener">Source</a></p>

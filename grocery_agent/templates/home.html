@@ -1,5 +1,109 @@
 {% extends "base.html" %}
 {% block title %}Grocery Agent{% endblock %}
+{% block head %}
+  <style>
+    .recipe-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1rem;
+    }
+    .recipe-card {
+      background: var(--bg);
+      border: var(--pixel) solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .recipe-card-image-wrap {
+      aspect-ratio: 4/3;
+      background: var(--border);
+      overflow: hidden;
+    }
+    .recipe-card-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .recipe-card-image-placeholder {
+      background: linear-gradient(135deg, var(--bg-dots) 0%, var(--border) 100%);
+    }
+    .recipe-card-label {
+      margin: 0;
+      padding: 0.5rem 0.6rem 0;
+      cursor: pointer;
+      display: block;
+      flex: 1;
+      min-width: 0;
+    }
+    .recipe-card-label input { margin-right: 0.4rem; vertical-align: middle; }
+    .recipe-card-name {
+      font-weight: 500;
+      display: inline;
+      word-break: break-word;
+    }
+    .recipe-card-portions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.4rem;
+      padding: 0.5rem 0.6rem;
+      border-top: 1px solid var(--border);
+    }
+    .recipe-card-actions {
+      --edge: 0.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.2rem var(--edge) var(--edge);
+      margin-top: auto;
+    }
+    .loading-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(253, 246, 232, 0.92);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .loading-overlay.active {
+      display: flex;
+    }
+    .loading-overlay-msg {
+      font-family: var(--font-pixel);
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .loading-pixels {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-end;
+    }
+    .loading-pixels span {
+      width: 12px;
+      height: 12px;
+      background: var(--accent);
+      border: var(--pixel) solid var(--border);
+      border-radius: 2px;
+      animation: pixel-bounce 0.6s ease-in-out infinite;
+    }
+    .loading-pixels span:nth-child(1) { animation-delay: 0s; }
+    .loading-pixels span:nth-child(2) { animation-delay: 0.1s; }
+    .loading-pixels span:nth-child(3) { animation-delay: 0.2s; }
+    .loading-pixels span:nth-child(4) { animation-delay: 0.3s; }
+    .loading-pixels span:nth-child(5) { animation-delay: 0.4s; }
+    @keyframes pixel-bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+  </style>
+{% endblock %}
 {% block content %}
   <header style="margin-bottom: 1.75rem;">
     <h1>Grocery Agent</h1>
@@ -12,24 +116,36 @@
 
   {% if recipes %}
   <div class="card">
-    <form method="post" action="/list">
+    <form id="list-form" method="post" action="/list">
       <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem;">
         <strong>This week</strong>
         <button type="submit">Generate grocery list</button>
       </div>
-      <ul class="recipe-list">
+      <div class="recipe-grid">
         {% for r in recipes %}
-        <li>
-          <label style="margin: 0; flex: 1; min-width: 0;">
+        <div class="recipe-card">
+          <div class="recipe-card-image-wrap">
+            {% if r.get('image_url') %}
+            <img src="{{ r.image_url }}" alt="" class="recipe-card-image" loading="lazy" referrerpolicy="no-referrer">
+            {% else %}
+            <div class="recipe-card-image recipe-card-image-placeholder" aria-hidden="true"></div>
+            {% endif %}
+          </div>
+          <label class="recipe-card-label">
             <input type="checkbox" name="recipe_ids" value="{{ r.id }}" {{ 'checked' if new_id and r.id == new_id else '' }}>
-            {{ r.name }}
+            <span class="recipe-card-name">{{ r.name }}</span>
           </label>
-          <span class="muted" style="font-size: 0.95rem;">Portions</span>
-          <input type="number" name="portion_{{ r.id }}" value="{{ r.portions | int }}" min="1" max="99" class="input-count">
-          <a href="/recipe/{{ r.id }}/edit" style="font-size: 0.9rem;">Edit</a>
-        </li>
+          <div class="recipe-card-portions">
+            <span class="muted" style="font-size: 0.95rem;">Portions</span>
+            <input type="number" name="portion_{{ r.id }}" value="{{ r.portions | int }}" min="1" max="99" class="input-count">
+          </div>
+          <div class="recipe-card-actions">
+            <a href="/recipe/{{ r.id }}" target="_blank" rel="noopener noreferrer" style="font-size: 0.9rem;">View</a>
+            <a href="/recipe/{{ r.id }}/edit" style="font-size: 0.9rem;">Edit</a>
+          </div>
+        </div>
         {% endfor %}
-      </ul>
+      </div>
     </form>
   </div>
   {% else %}
@@ -40,7 +156,7 @@
 
   <div class="card">
     <h2 style="margin-top: 0;">Add a recipe</h2>
-    <form method="post" action="/ingest">
+    <form id="ingest-form" method="post" action="/ingest">
       <label for="url">Recipe URL (optional)</label>
       <input type="url" id="url" name="url" placeholder="https://...">
       <label for="text">Or paste recipe text</label>
@@ -48,4 +164,34 @@
       <button type="submit">Add recipe</button>
     </form>
   </div>
+
+  <div id="loading-overlay" class="loading-overlay" aria-live="polite" aria-busy="true" hidden>
+    <div class="loading-pixels" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <span id="loading-msg" class="loading-overlay-msg"></span>
+  </div>
+  <script>
+    (function() {
+      var overlay = document.getElementById('loading-overlay');
+      var msg = document.getElementById('loading-msg');
+      if (!overlay || !msg) return;
+      var listForm = document.getElementById('list-form');
+      var ingestForm = document.getElementById('ingest-form');
+      if (listForm) {
+        listForm.addEventListener('submit', function() {
+          msg.textContent = 'Generating grocery list…';
+          overlay.classList.add('active');
+          overlay.removeAttribute('hidden');
+        });
+      }
+      if (ingestForm) {
+        ingestForm.addEventListener('submit', function() {
+          msg.textContent = 'Adding recipe…';
+          overlay.classList.add('active');
+          overlay.removeAttribute('hidden');
+        });
+      }
+    })();
+  </script>
 {% endblock %}

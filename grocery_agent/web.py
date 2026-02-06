@@ -21,7 +21,7 @@ from grocery_agent.db import (
     replace_recipe_ingredients,
     update_recipe,
 )
-from grocery_agent.fetch import fetch_recipe_text
+from grocery_agent.fetch import fetch_recipe_image_url, fetch_recipe_text
 from grocery_agent.ingredient_normalizer import normalize_ingredients_with_llm
 from grocery_agent.models import Recipe
 from grocery_agent.recipe import parse_recipe
@@ -102,6 +102,7 @@ async def list_submit(
             conn.close()
             return _home_response(request, recipes, str(e))
         recipe.source_url = url.strip()
+        recipe.image_url = await fetch_recipe_image_url(url.strip())
         conn = get_connection()
         try:
             new_id = insert_recipe(conn, recipe)
@@ -303,6 +304,7 @@ async def ingest(
         return _home_response(request, recipes, str(e))
     if url and url.strip():
         recipe.source_url = url.strip()
+        recipe.image_url = await fetch_recipe_image_url(url.strip())
     conn = get_connection()
     try:
         recipe_id = insert_recipe(conn, recipe)
