@@ -1,45 +1,34 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ recipe.name }} – Grocery Agent</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
-    h1 { font-size: 1.5rem; }
-    a { color: #06c; }
-    .meta { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
-    ul.ingredients { list-style: none; padding: 0; }
-    ul.ingredients li { padding: 0.2rem 0; border-bottom: 1px solid #eee; }
-    .category { color: #666; font-size: 0.85rem; }
-    .optional { color: #888; font-style: italic; }
-    .instructions { white-space: pre-wrap; margin-top: 1rem; }
-    .back { margin-top: 1.5rem; }
-  </style>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}{{ recipe.name }} – Grocery Agent{% endblock %}
+{% block content %}
+  <nav class="nav"><a href="/">← Recipes</a></nav>
   <h1>{{ recipe.name }}</h1>
   {% if recipe.source_url %}
-  <p class="meta"><a href="{{ recipe.source_url }}" target="_blank" rel="noopener">Source</a></p>
+  <p class="muted"><a href="{{ recipe.source_url }}" target="_blank" rel="noopener">Source</a></p>
   {% endif %}
-  <form method="get" action="/recipe/{{ recipe_id }}" class="servings-form" style="margin-bottom: 1rem;">
-    <label for="servings">Servings:</label>
-    <input type="number" id="servings" name="servings" value="{{ servings }}" min="1" max="99" style="width: 4ch;">
-    <button type="submit">Update</button>
-  </form>
+
+  <div class="card" style="display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;">
+    <form method="get" action="/recipe/{{ recipe_id }}" style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+      <label for="servings" style="margin: 0;">Servings</label>
+      <input type="number" id="servings" name="servings" value="{{ servings }}" min="1" max="99" class="input-count" style="margin: 0;">
+      <button type="submit">Update</button>
+    </form>
+  </div>
+
   <h2>Ingredients</h2>
-  <p class="meta">Pantry = likely have at home. Weekly = need to buy. Form = for cart search (fresh/canned/frozen/dried/liquid).</p>
-  <ul class="ingredients">
+  <p class="muted">Pantry = have at home. Weekly = to buy.</p>
+  <ul class="pixel-list">
     {% for ing in ingredients_display %}
-    <li class="{{ 'optional' if ing.optional else '' }}">
-      {{ ing.amount_str }} {{ ing.name }}{% if ing.optional %} <span class="optional">(optional)</span>{% endif %}
-      <span class="category">({{ ing.category.value }})</span>
-      <span class="meta">{% if ing.pantry_item %}pantry{% else %}weekly{% endif %} · {{ ing.form.value if ing.form else 'fresh' }}</span>
+    <li>
+      {{ ing.amount_str }} {{ ing.name }}{% if ing.optional %} <span class="muted" style="font-style: italic;">(optional)</span>{% endif %}
+      <span class="muted" style="font-size: 0.95rem;"> · {{ ing.category.value }} · {% if ing.pantry_item %}pantry{% else %}weekly{% endif %}</span>
     </li>
     {% endfor %}
   </ul>
+
   <h2>Instructions</h2>
-  <div class="instructions">{{ recipe.instructions }}</div>
-  <p class="back"><a href="/">Back to recipes</a></p>
-</body>
-</html>
+  <div class="card">
+    <pre style="white-space: pre-wrap; font-family: inherit; margin: 0; line-height: 1.6;">{{ recipe.instructions }}</pre>
+  </div>
+  <p><a href="/">← Back to recipes</a></p>
+{% endblock %}

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Grocery Agent{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fdf6e8;
+      --bg-dots: #f5eed9;
+      --surface: #fffef9;
+      --border: #2d2a26;
+      --text: #2d2a26;
+      --muted: #6b6560;
+      --accent: #e07a5f;
+      --accent-dark: #c46a52;
+      --accent-cute: #81b29a;
+      --pixel: 3px;
+      --radius: 4px;
+      --space: 1rem;
+      --font-body: 'VT323', monospace;
+      --font-pixel: 'Pixelify Sans', cursive;
+      --font-title: 'Press Start 2P', cursive;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: var(--space);
+      line-height: 1.5;
+      font-size: 20px;
+      background-image: radial-gradient(circle at 1px 1px, rgba(45, 42, 38, 0.06) 1px, transparent 0);
+      background-size: 20px 20px;
+      background-position: 0 0;
+    }
+    .page { max-width: {% block max_width %}42rem{% endblock %}; margin: 0 auto; }
+    h1 {
+      font-family: var(--font-title);
+      font-size: 1.4rem;
+      font-weight: 400;
+      margin: 0 0 0.35rem 0;
+      letter-spacing: 0.02em;
+      color: var(--text);
+    }
+    h2 {
+      font-family: var(--font-pixel);
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 1.5rem 0 0.5rem 0;
+    }
+    p { margin: 0 0 0.75rem 0; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; color: var(--accent-dark); }
+    .muted { color: var(--muted); font-size: 1rem; }
+    .nav { margin-bottom: 1.25rem; font-size: 1rem; color: var(--muted); }
+    .nav a { color: var(--accent); }
+    .card {
+      background: var(--surface);
+      border: var(--pixel) solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: var(--space);
+      box-shadow: 4px 4px 0 var(--border);
+    }
+    label { display: block; font-weight: 500; margin-top: 0.75rem; cursor: pointer; }
+    label:first-of-type { margin-top: 0; }
+    input[type="text"], input[type="number"], input[type="url"], textarea, select {
+      width: 100%;
+      padding: 0.5rem 0.65rem;
+      border: var(--pixel) solid var(--border);
+      border-radius: var(--radius);
+      font-family: var(--font-body);
+      font-size: 1.2rem;
+      margin-top: 0.25rem;
+      background: var(--surface);
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-cute);
+    }
+    button {
+      font-family: var(--font-body);
+      font-size: 1.2rem;
+      font-weight: 400;
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: #fff;
+      border: var(--pixel) solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      box-shadow: 3px 3px 0 var(--border);
+    }
+    button:hover {
+      background: var(--accent-dark);
+      transform: translate(1px, 1px);
+      box-shadow: 2px 2px 0 var(--border);
+    }
+    button:active {
+      transform: translate(2px, 2px);
+      box-shadow: none;
+    }
+    .btn-ghost { background: transparent; color: var(--muted); }
+    .btn-ghost:hover { background: var(--bg); color: var(--text); }
+    .alert {
+      padding: 0.75rem 1rem;
+      border: var(--pixel) solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: var(--space);
+      font-family: var(--font-body);
+      box-shadow: 3px 3px 0 var(--border);
+    }
+    .alert-error {
+      background: #fef2f2;
+      border-color: #b91c1c;
+      color: #b91c1c;
+    }
+    .recipe-list { list-style: none; padding: 0; margin: 0; }
+    .recipe-list li {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      padding: 0.6rem 0;
+      border-bottom: 2px solid var(--border);
+    }
+    .recipe-list li:last-child { border-bottom: none; }
+    input.input-count {
+      width: 8ch;
+      min-width: 8ch;
+      max-width: 8ch;
+      flex: 0 0 auto;
+      padding: 0.4rem 0.5rem;
+      font-size: 1.2rem;
+      text-align: center;
+      margin-top: 0;
+    }
+    .count-num { font-size: 1.35em; }
+    .amount-label { display: inline-block; }
+    .pixel-list { list-style: none; padding: 0; margin: 0; }
+    .pixel-list li { padding: 0.5rem 0; border-bottom: 2px solid var(--border); }
+    .pixel-list li:last-child { border-bottom: none; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="page">
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

@@ -1,92 +1,99 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Edit {{ recipe.name }} – Grocery Agent</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
-    h1 { font-size: 1.15rem; }
-    h2 { font-size: 1rem; margin: 1.25rem 0 0.5rem 0; }
-    a { color: #06c; }
-    label { display: block; margin-top: 0.75rem; font-weight: 500; }
-    input[type="text"], input[type="number"], input[type="url"], textarea, select { padding: 0.45rem; box-sizing: border-box; }
-    input[type="text"], input[type="number"], input[type="url"], textarea { width: 100%; }
-    textarea { min-height: 100px; resize: vertical; }
-    .actions { margin-top: 1.25rem; display: flex; gap: 0.75rem; align-items: center; }
-    button { padding: 0.45rem 0.9rem; cursor: pointer; }
-    .ingredients-wrap { overflow-x: auto; margin-top: 0.5rem; border: 1px solid #e0e0e0; border-radius: 8px; padding: 0.75rem; background: #fafafa; }
-    /* Single grid for header + rows so columns align. Name gets most space. */
-    .ingredients-grid {
-      display: grid;
-      grid-template-columns: minmax(180px, 2.5fr) 6ch minmax(72px, 1fr) minmax(92px, 1fr) minmax(82px, 1fr) auto auto;
-      gap: 0.5rem 0.85rem;
-      align-items: center;
-      min-width: min(100%, 640px);
-    }
-    .ingredients-grid .ingredient-header { font-size: 0.8rem; color: #555; font-weight: 600; padding: 0.25rem 0 0.5rem 0; border-bottom: 1px solid #ccc; }
-    .ingredients-grid input, .ingredients-grid select { margin: 0; padding: 0.4rem 0.5rem; border: 1px solid #ddd; border-radius: 4px; }
-    .ingredients-grid input:focus, .ingredients-grid select:focus { outline: none; border-color: #06c; }
-    .ingredients-grid .name { min-width: 0; }
-    .ingredients-grid .qty { width: 100%; }
-    .ingredients-grid .unit { min-width: 0; }
-    .ingredients-grid select { min-width: 0; width: 100%; cursor: pointer; }
-    .ingredients-grid label { margin: 0; font-weight: normal; display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; padding: 0.25rem 0; }
-    /* Zebra stripe every other data row (grid children 8–14, 22–28, …) */
-    .ingredients-grid > *:nth-child(14n+8), .ingredients-grid > *:nth-child(14n+9), .ingredients-grid > *:nth-child(14n+10),
-    .ingredients-grid > *:nth-child(14n+11), .ingredients-grid > *:nth-child(14n+12), .ingredients-grid > *:nth-child(14n+13),
-    .ingredients-grid > *:nth-child(14n+14) { background: #f0f0f0; border-radius: 4px; }
-  </style>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Edit {{ recipe.name }} – Grocery Agent{% endblock %}
+{% block max_width %}48rem{% endblock %}
+{% block content %}
+  <nav class="nav"><a href="/">← Recipes</a></nav>
   <h1>Edit recipe</h1>
-  <form method="post" action="/recipe/{{ recipe_id }}/edit">
-    <label for="name">Name</label>
-    <input type="text" id="name" name="name" value="{{ recipe.name }}" required>
-    <label for="portions">Portions</label>
-    <input type="number" id="portions" name="portions" value="{{ recipe.portions }}" min="0.25" step="0.25" required>
-    <label for="instructions">Instructions</label>
-    <textarea id="instructions" name="instructions">{{ recipe.instructions }}</textarea>
-    <label for="source_url">Source URL (optional)</label>
-    <input type="url" id="source_url" name="source_url" value="{{ recipe.source_url or '' }}" placeholder="https://...">
 
-    <h2>Ingredients</h2>
-    <div class="ingredients-wrap">
-    <div class="ingredients-grid">
-      <span class="ingredient-header">Name</span>
-      <span class="ingredient-header">Qty</span>
-      <span class="ingredient-header">Unit</span>
-      <span class="ingredient-header">Category</span>
-      <span class="ingredient-header">Form</span>
-      <span class="ingredient-header">Opt</span>
-      <span class="ingredient-header">Pantry</span>
-      {% for i in range(ingredient_count) %}
-      <input type="text" class="name" name="ingredient_{{ i }}_name" placeholder="Name" value="{{ recipe.ingredients[i].name if i < recipe.ingredients | length else '' }}">
-      <input type="number" class="qty" name="ingredient_{{ i }}_qty" placeholder="–" step="any" min="0" value="{{ recipe.ingredients[i].quantity_per_portion if i < recipe.ingredients | length and recipe.ingredients[i].quantity_per_portion is not none else '' }}">
-      <input type="text" class="unit" name="ingredient_{{ i }}_unit" placeholder="unit" value="{{ recipe.ingredients[i].unit or '' if i < recipe.ingredients | length else '' }}">
-      <select name="ingredient_{{ i }}_category">
-        {% for cat in ['other', 'pantry', 'dairy', 'produce', 'meat', 'seafood', 'spice', 'condiment', 'frozen'] %}
-        <option value="{{ cat }}" {{ 'selected' if i < recipe.ingredients | length and recipe.ingredients[i].category.value == cat else '' }}>{{ cat }}</option>
-        {% endfor %}
-      </select>
-      <select name="ingredient_{{ i }}_form">
-        <option value="fresh" {{ 'selected' if i < recipe.ingredients | length and recipe.ingredients[i].form.value == 'fresh' else '' }}>fresh</option>
-        <option value="canned" {{ 'selected' if i < recipe.ingredients | length and recipe.ingredients[i].form.value == 'canned' else '' }}>canned</option>
-        <option value="frozen" {{ 'selected' if i < recipe.ingredients | length and recipe.ingredients[i].form.value == 'frozen' else '' }}>frozen</option>
-        <option value="dried" {{ 'selected' if i < recipe.ingredients | length and recipe.ingredients[i].form.value == 'dried' else '' }}>dried</option>
-        <option value="liquid" {{ 'selected' if i < recipe.ingredients | length and recipe.ingredients[i].form.value == 'liquid' else '' }}>liquid</option>
-      </select>
-      <label><input type="checkbox" name="ingredient_{{ i }}_optional" value="1" {{ 'checked' if i < recipe.ingredients | length and recipe.ingredients[i].optional else '' }}> opt</label>
-      <label><input type="checkbox" name="ingredient_{{ i }}_pantry" value="1" {{ 'checked' if i < recipe.ingredients | length and recipe.ingredients[i].pantry_item else '' }}> pantry</label>
-      {% endfor %}
+  <form method="post" action="/recipe/{{ recipe_id }}/edit">
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" value="{{ recipe.name }}" required>
+      <label for="portions">Portions</label>
+      <input type="number" id="portions" name="portions" value="{{ recipe.portions }}" min="0.25" step="0.25" required>
+      <label for="instructions">Instructions</label>
+      <textarea id="instructions" name="instructions" style="min-height: 12rem;">{{ recipe.instructions }}</textarea>
+      <label for="source_url">Source URL (optional)</label>
+      <input type="url" id="source_url" name="source_url" value="{{ recipe.source_url or '' }}" placeholder="https://...">
     </div>
+
+    <h2 style="margin-top: 0.5rem;">Ingredients</h2>
+    <div class="card" style="overflow-x: auto; padding: 0.75rem; margin-bottom: 1.5rem;">
+      <div class="ingredients-grid">
+        <span class="ingredient-header">Name</span>
+        <span class="ingredient-header">Qty</span>
+        <span class="ingredient-header">Unit</span>
+        <span class="ingredient-header">Category</span>
+        <span class="ingredient-header">Form</span>
+        <span class="ingredient-header ingredient-header-opt">Opt</span>
+        <span class="ingredient-header ingredient-header-pantry">Pantry</span>
+        {% for i in range(ingredient_count) %}
+        <input type="text" class="name" name="ingredient_{{ i }}_name" placeholder="Name" value="{{ recipe.ingredients[i].name if i < recipe.ingredients | length else '' }}">
+        <input type="number" class="qty" name="ingredient_{{ i }}_qty" placeholder="–" step="any" min="0" value="{{ recipe.ingredients[i].quantity_per_portion if i < recipe.ingredients | length and recipe.ingredients[i].quantity_per_portion is not none else '' }}">
+        <input type="text" class="unit" name="ingredient_{{ i }}_unit" placeholder="unit" value="{{ recipe.ingredients[i].unit or '' if i < recipe.ingredients | length else '' }}">
+        <select name="ingredient_{{ i }}_category">
+          {% for cat in ['other', 'pantry', 'dairy', 'produce', 'meat', 'seafood', 'spice', 'condiment', 'frozen'] %}
+          <option value="{{ cat }}" {{ 'selected' if i < recipe.ingredients | length and recipe.ingredients[i].category.value == cat else '' }}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+        <select name="ingredient_{{ i }}_form">
+          <option value="fresh" {{ 'selected' if i < recipe.ingredients | length and recipe.ingredients[i].form.value == 'fresh' else '' }}>fresh</option>
+          <option value="canned" {{ 'selected' if i < recipe.ingredients | length and recipe.ingredients[i].form.value == 'canned' else '' }}>canned</option>
+          <option value="frozen" {{ 'selected' if i < recipe.ingredients | length and recipe.ingredients[i].form.value == 'frozen' else '' }}>frozen</option>
+          <option value="dried" {{ 'selected' if i < recipe.ingredients | length and recipe.ingredients[i].form.value == 'dried' else '' }}>dried</option>
+          <option value="liquid" {{ 'selected' if i < recipe.ingredients | length and recipe.ingredients[i].form.value == 'liquid' else '' }}>liquid</option>
+        </select>
+        <label class="cell-opt"><input type="checkbox" name="ingredient_{{ i }}_optional" value="1" {{ 'checked' if i < recipe.ingredients | length and recipe.ingredients[i].optional else '' }}> opt</label>
+        <label class="cell-pantry"><input type="checkbox" name="ingredient_{{ i }}_pantry" value="1" {{ 'checked' if i < recipe.ingredients | length and recipe.ingredients[i].pantry_item else '' }}> pantry</label>
+        {% endfor %}
+      </div>
     </div>
     <input type="hidden" name="ingredient_count" value="{{ ingredient_count }}">
 
-    <div class="actions">
+    <div style="display: flex; gap: 0.75rem; align-items: center; margin-top: 1.25rem;">
       <button type="submit">Save</button>
       <a href="/">Cancel</a>
     </div>
   </form>
-</body>
-</html>
+{% endblock %}
+
+{% block head %}
+  <style>
+    .ingredients-grid {
+      display: grid;
+      grid-template-columns: minmax(160px, 2fr) minmax(9ch, 11ch) minmax(60px, 1fr) minmax(80px, 1fr) minmax(70px, 1fr) auto auto;
+      gap: 0.5rem 0.75rem;
+      align-items: center;
+    }
+    .ingredient-header {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--muted);
+      padding-bottom: 0.25rem;
+      border-bottom: var(--pixel) solid var(--border);
+    }
+    .ingredient-header-opt,
+    .ingredient-header-pantry {
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+    }
+    .ingredients-grid input, .ingredients-grid select { margin: 0; padding: 0.4rem 0.5rem; border-width: var(--pixel); }
+    .ingredients-grid .name { min-width: 0; }
+    .ingredients-grid .qty { min-width: 9ch; width: 100%; }
+    .ingredients-grid .cell-opt,
+    .ingredients-grid .cell-pantry {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+      min-height: 2.25rem;
+    }
+    .ingredients-grid .cell-opt input,
+    .ingredients-grid .cell-pantry input { margin: 0; }
+    .ingredients-grid > *:nth-child(14n+8), .ingredients-grid > *:nth-child(14n+9), .ingredients-grid > *:nth-child(14n+10),
+    .ingredients-grid > *:nth-child(14n+11), .ingredients-grid > *:nth-child(14n+12), .ingredients-grid > *:nth-child(14n+13),
+    .ingredients-grid > *:nth-child(14n+14) { background: var(--bg); border-radius: var(--radius); }
+  </style>
+{% endblock %}
