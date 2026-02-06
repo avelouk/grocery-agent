@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grocery Agent</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.35rem; margin-bottom: 0.25rem; }
+    .subtitle { color: #555; font-size: 0.95rem; margin-bottom: 1.5rem; }
+    a { color: #06c; }
+    label { display: block; margin-top: 0.75rem; cursor: pointer; }
+    input[type="checkbox"] { margin-right: 0.5rem; }
+    .recipes { margin: 1rem 0; padding-left: 0; list-style: none; }
+    .recipes li { padding: 0.5rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+    .recipes li label { margin-top: 0; flex: 1; }
+    .recipes li .portions { width: 4ch; padding: 0.35rem; }
+    .recipes li .edit-link { font-size: 0.85rem; margin-left: 0.25rem; }
+    .add-recipe { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #ddd; }
+    .add-recipe h2 { font-size: 1rem; margin-bottom: 0.5rem; }
+    .add-recipe label { font-weight: 500; margin-top: 0.5rem; }
+    input[type="url"], textarea { width: 100%; padding: 0.5rem; box-sizing: border-box; }
+    textarea { min-height: 88px; resize: vertical; }
+    button { margin-top: 0.75rem; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.95rem; }
+    button.primary { font-weight: 600; }
+    .error { color: #c00; margin-top: 1rem; }
+    .empty-state { background: #f6f6f6; padding: 1.25rem; border-radius: 8px; margin-bottom: 1rem; color: #444; }
+    .empty-state p { margin: 0 0 0.5rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Grocery Agent</h1>
+  <p class="subtitle">Choose recipes for the week, then generate your grocery list.</p>
+
+  {% if error %}
+  <p class="error">{{ error }}</p>
+  {% endif %}
+
+  {% if recipes %}
+  <form method="post" action="/list">
+    <p><strong>Recipes</strong></p>
+    <ul class="recipes">
+      {% for r in recipes %}
+      <li>
+        <label>
+          <input type="checkbox" name="recipe_ids" value="{{ r.id }}" {{ 'checked' if new_id and r.id == new_id else '' }}>
+          {{ r.name }}
+        </label>
+        <span>Portions:</span>
+        <input type="number" name="portion_{{ r.id }}" value="{{ r.portions | int }}" min="1" max="99" class="portions" title="Portions">
+        <a href="/recipe/{{ r.id }}/edit" class="edit-link">Edit</a>
+      </li>
+      {% endfor %}
+    </ul>
+    <button type="submit" class="primary">Generate grocery list</button>
+  </form>
+  {% else %}
+  <div class="empty-state">
+    <p><strong>No recipes yet.</strong></p>
+    <p>Add one below with a recipe link or pasted text. It will be saved and selected for the week.</p>
+  </div>
+  {% endif %}
+
+  <div class="add-recipe">
+    <h2>Add a new recipe</h2>
+    <form method="post" action="/ingest">
+      <label for="url">Recipe URL (optional)</label>
+      <input type="url" id="url" name="url" placeholder="https://...">
+      <label for="text">Or paste recipe text</label>
+      <textarea id="text" name="text" placeholder="Paste recipe here..."></textarea>
+      <button type="submit">Add recipe</button>
+    </form>
+  </div>
+</body>
+</html>

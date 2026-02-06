@@ -92,6 +92,58 @@ def insert_recipe(conn: sqlite3.Connection, recipe: Recipe) -> int:
     return recipe_id
 
 
+def update_recipe(
+    conn: sqlite3.Connection,
+    recipe_id: int,
+    name: str,
+    portions: float,
+    instructions: str,
+    source_url: str | None = None,
+) -> bool:
+    """Update recipe name, portions, instructions, source_url. Returns True if recipe existed."""
+    cur = conn.execute(
+        "UPDATE recipes SET name = ?, portions = ?, instructions = ?, source_url = ? WHERE id = ?",
+        (name.strip(), portions, instructions.strip(), source_url.strip() if source_url else None, recipe_id),
+    )
+    return cur.rowcount > 0
+
+
+def replace_recipe_ingredients(
+    conn: sqlite3.Connection,
+    recipe_id: int,
+    ingredients: list[dict],
+) -> None:
+    """
+    Replace all ingredients for a recipe. ingredients: list of dicts with
+    name, quantity_per_portion (float|None), unit (str), category (str), optional (bool), pantry_item (bool), form (str).
+    """
+    conn.execute("DELETE FROM recipe_ingredients WHERE recipe_id = ?", (recipe_id,))
+    for ing in ingredients:
+        name = (ing.get("name") or "").strip()
+        if not name:
+            continue
+        qpp = ing.get("quantity_per_portion")
+        if qpp is not None:
+            try:
+                qpp = float(qpp)
+            except (TypeError, ValueError):
+                qpp = None
+        unit = (ing.get("unit") or "").strip() or None
+        category = (ing.get("category") or "other").strip().lower()
+        if category not in [e.value for e in IngredientCategory]:
+            category = "other"
+        optional = bool(ing.get("optional"))
+        pantry_item = bool(ing.get("pantry_item"))
+        form = (ing.get("form") or "fresh").strip().lower()
+        if form not in [e.value for e in IngredientForm]:
+            form = "fresh"
+        conn.execute(
+            """INSERT INTO recipe_ingredients (recipe_id, name, quantity_per_portion, unit, category, optional, pantry_item, form)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (recipe_id, name, qpp, unit, category, 1 if optional else 0, 1 if pantry_item else 0, form),
+        )
+
+
 def recipe_from_row(
     conn: sqlite3.Connection, recipe_id: int
 ) -> Optional[Recipe]:

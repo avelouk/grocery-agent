@@ -2,10 +2,14 @@ README.md
 pyproject.toml
 run_jumbo.py
 grocery_agent/__init__.py
+grocery_agent/aggregate.py
 grocery_agent/db.py
 grocery_agent/fetch.py
+grocery_agent/grocery_list.py
+grocery_agent/ingredient_normalizer.py
 grocery_agent/llm.py
 grocery_agent/models.py
+grocery_agent/quantity_parser.py
 grocery_agent/recipe.py
 grocery_agent/web.py
 grocery_agent.egg-info/PKG-INFO

@@ -22,7 +22,7 @@
   </style>
 </head>
 <body>
-  <nav class="nav"><a href="/">Ingest</a> · <a href="/list">Grocery list</a> · <strong>Checklist</strong></nav>
+  <nav class="nav"><a href="/">Home</a> · <strong>Checklist</strong></nav>
   <h1>Your grocery list</h1>
   <p class="meta">Recipes: {% for r in recipes %}{{ r.name }} ({{ r.portions | int }} portions){% if not loop.last %}; {% endif %}{% endfor %}</p>
   <p class="meta">Items <strong>checked</strong> will be ordered. By default, pantry items (likely have at home) are unchecked — check any you need to restock.</p>
@@ -45,6 +45,6 @@
     </ul>
     <button type="submit">Confirm and add to cart</button>
   </form>
-  <p class="back"><a href="/list">Change recipes</a></p>
+  <p class="back"><a href="/">Change recipes</a></p>
 </body>
 </html>

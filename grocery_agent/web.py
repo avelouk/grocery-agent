@@ -12,7 +12,15 @@ from fastapi.templating import Jinja2Templates
 import httpx
 
 from grocery_agent.aggregate import flat_ingredients, merge_flat_ingredients
-from grocery_agent.db import get_connection, init_db, insert_recipe, list_recipes, recipe_from_row
+from grocery_agent.db import (
+    get_connection,
+    init_db,
+    insert_recipe,
+    list_recipes,
+    recipe_from_row,
+    replace_recipe_ingredients,
+    update_recipe,
+)
 from grocery_agent.fetch import fetch_recipe_text
 from grocery_agent.ingredient_normalizer import normalize_ingredients_with_llm
 from grocery_agent.models import Recipe
@@ -26,24 +34,37 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
+def _home_response(
+    request: Request,
+    recipes: list,
+    error: str | None = None,
+    new_id: int | None = None,
+):
+    """Render the home page (recipe picker + add recipe)."""
+    return templates.TemplateResponse(
+        "home.html",
+        {"request": request, "recipes": recipes, "error": error, "new_id": new_id},
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    """Form: paste recipe text or paste recipe URL."""
-    return templates.TemplateResponse("index.html", {"request": request})
-
-
-@app.get("/list", response_class=HTMLResponse)
-async def list_page(request: Request):
-    """Step 1: Pick recipes for the week (from saved or paste link/text to ingest)."""
+async def home(request: Request, new_id: int | None = None):
+    """Single home: pick recipes for the week, or add a new one (link/text). new_id pre-selects that recipe."""
     conn = get_connection()
     try:
         recipes = list_recipes(conn)
     finally:
         conn.close()
     return templates.TemplateResponse(
-        "list.html",
-        {"request": request, "recipes": recipes},
+        "home.html",
+        {"request": request, "recipes": recipes, "new_id": new_id},
     )
+
+
+@app.get("/list", response_class=HTMLResponse)
+async def list_redirect():
+    """Redirect to home."""
+    return RedirectResponse(url="/", status_code=302)
 
 
 @app.post("/list", response_class=HTMLResponse)
@@ -72,20 +93,14 @@ async def list_submit(
                 recipes = list_recipes(conn)
             finally:
                 conn.close()
-            return templates.TemplateResponse(
-                "list.html",
-                {"request": request, "recipes": recipes, "error": "Could not fetch URL. Try pasting text."},
-            )
+            return _home_response(request, recipes, "Could not fetch URL. Try pasting text.")
         try:
             recipe = await parse_recipe(recipe_text)
         except ValueError as e:
             conn = get_connection()
             recipes = list_recipes(conn)
             conn.close()
-            return templates.TemplateResponse(
-                "list.html",
-                {"request": request, "recipes": recipes, "error": str(e)},
-            )
+            return _home_response(request, recipes, str(e))
         recipe.source_url = url.strip()
         conn = get_connection()
         try:
@@ -101,10 +116,7 @@ async def list_submit(
             conn = get_connection()
             recipes = list_recipes(conn)
             conn.close()
-            return templates.TemplateResponse(
-                "list.html",
-                {"request": request, "recipes": recipes, "error": str(e)},
-            )
+            return _home_response(request, recipes, str(e))
         conn = get_connection()
         try:
             new_id = insert_recipe(conn, recipe)
@@ -118,10 +130,7 @@ async def list_submit(
             recipes = list_recipes(conn)
         finally:
             conn.close()
-            return templates.TemplateResponse(
-                "list.html",
-                {"request": request, "recipes": recipes, "error": "Select at least one recipe or add one by link/text."},
-            )
+            return _home_response(request, recipes, "Select at least one recipe or add one below.")
     form = await request.form()
     portion_qs = []
     for rid in ids:
@@ -146,7 +155,7 @@ async def checklist_page(request: Request, ids: str = ""):
     """
     recipe_ids = [int(x.strip()) for x in ids.split(",") if x.strip()]
     if not recipe_ids:
-        return RedirectResponse(url="/list", status_code=302)
+        return RedirectResponse(url="/", status_code=302)
     portions_override = {}
     for rid in recipe_ids:
         raw = request.query_params.get(f"portion_{rid}")
@@ -271,37 +280,27 @@ async def ingest(
     text: str | None = Form(None),
     url: str | None = Form(None),
 ):
-    """
-    Ingest recipe: either paste text or paste URL.
-    Fetch URL if given, then one LLM call → save to SQLite → show recipe.
-    """
+    """Add a new recipe (URL or text). Redirect to home with new recipe selected."""
+    conn = get_connection()
+    try:
+        recipes = list_recipes(conn)
+    finally:
+        conn.close()
     if url and url.strip():
         try:
             recipe_text = await fetch_recipe_text(url.strip())
         except httpx.HTTPStatusError as e:
-            return templates.TemplateResponse(
-                "index.html",
-                {"request": request, "error": f"Could not fetch URL: {e.response.status_code} {e.response.reason_phrase}. Try pasting the recipe text instead."},
-            )
+            return _home_response(request, recipes, f"Could not fetch URL: {e.response.status_code}. Try pasting the recipe text instead.")
         except httpx.RequestError as e:
-            return templates.TemplateResponse(
-                "index.html",
-                {"request": request, "error": f"Could not fetch URL: {e!s}. Try pasting the recipe text instead."},
-            )
+            return _home_response(request, recipes, f"Could not fetch URL: {e!s}. Try pasting the recipe text instead.")
     elif text and text.strip():
         recipe_text = text.strip()
     else:
-        return templates.TemplateResponse(
-            "index.html",
-            {"request": request, "error": "Paste recipe text or a recipe URL."},
-        )
+        return _home_response(request, recipes, "Paste recipe text or a recipe URL.")
     try:
         recipe = await parse_recipe(recipe_text)
     except ValueError as e:
-        return templates.TemplateResponse(
-            "index.html",
-            {"request": request, "error": str(e)},
-        )
+        return _home_response(request, recipes, str(e))
     if url and url.strip():
         recipe.source_url = url.strip()
     conn = get_connection()
@@ -310,7 +309,7 @@ async def ingest(
         conn.commit()
     finally:
         conn.close()
-    return RedirectResponse(url=f"/recipe/{recipe_id}", status_code=303)
+    return RedirectResponse(url=f"/?new_id={recipe_id}", status_code=303)
 
 
 def run() -> None:
@@ -343,10 +342,12 @@ async def show_recipe(request: Request, recipe_id: int, servings: int = 4):
     finally:
         conn.close()
     if not recipe:
-        return templates.TemplateResponse(
-            "index.html",
-            {"request": request, "error": f"Recipe {recipe_id} not found."},
-        )
+        conn = get_connection()
+        try:
+            recipes = list_recipes(conn)
+        finally:
+            conn.close()
+        return _home_response(request, recipes, f"Recipe {recipe_id} not found.")
     # Precompute display string for each ingredient (scaled amount + unit, or just unit)
     ingredients_display = [
         {
@@ -369,3 +370,80 @@ async def show_recipe(request: Request, recipe_id: int, servings: int = 4):
             "ingredients_display": ingredients_display,
         },
     )
+
+
+@app.get("/recipe/{recipe_id}/edit", response_class=HTMLResponse)
+async def recipe_edit_page(request: Request, recipe_id: int):
+    """Minimal edit form: name, portions, instructions, source URL."""
+    conn = get_connection()
+    try:
+        recipe = recipe_from_row(conn, recipe_id)
+    finally:
+        conn.close()
+    if not recipe:
+        conn = get_connection()
+        try:
+            recipes = list_recipes(conn)
+        finally:
+            conn.close()
+        return _home_response(request, recipes, f"Recipe {recipe_id} not found.")
+    ingredient_count = len(recipe.ingredients) + 1  # +1 for empty "add" row
+    return templates.TemplateResponse(
+        "recipe_edit.html",
+        {"request": request, "recipe": recipe, "recipe_id": recipe_id, "ingredient_count": ingredient_count},
+    )
+
+
+@app.post("/recipe/{recipe_id}/edit", response_class=HTMLResponse)
+async def recipe_edit_submit(
+    request: Request,
+    recipe_id: int,
+    name: str = Form(...),
+    portions: float = Form(4),
+    instructions: str = Form(...),
+    source_url: str | None = Form(None),
+    ingredient_count: int = Form(0),
+):
+    """Update recipe (and ingredients) and redirect home."""
+    form = await request.form()
+    portions = max(0.25, float(portions))
+    ingredients = []
+    for i in range(ingredient_count):
+        iname = form.get(f"ingredient_{i}_name")
+        if iname is None or not str(iname).strip():
+            continue
+        qty_raw = form.get(f"ingredient_{i}_qty")
+        try:
+            qty = float(qty_raw) if qty_raw not in (None, "") else None
+        except (TypeError, ValueError):
+            qty = None
+        unit = form.get(f"ingredient_{i}_unit") or ""
+        category = form.get(f"ingredient_{i}_category") or "other"
+        optional = form.get(f"ingredient_{i}_optional") == "1"
+        pantry = form.get(f"ingredient_{i}_pantry") == "1"
+        form_val = form.get(f"ingredient_{i}_form") or "fresh"
+        ingredients.append({
+            "name": str(iname).strip(),
+            "quantity_per_portion": qty,
+            "unit": str(unit).strip() or None,
+            "category": str(category).strip() or "other",
+            "optional": optional,
+            "pantry_item": pantry,
+            "form": str(form_val).strip() or "fresh",
+        })
+    conn = get_connection()
+    try:
+        ok = update_recipe(conn, recipe_id, name, portions, instructions, source_url)
+        if ok:
+            replace_recipe_ingredients(conn, recipe_id, ingredients)
+        conn.commit()
+    finally:
+        conn.close()
+    if not ok:
+        conn = get_connection()
+        try:
+            recipes = list_recipes(conn)
+        finally:
+            conn.close()
+        return _home_response(request, recipes, f"Recipe {recipe_id} not found.")
+    return RedirectResponse(url="/", status_code=303)
