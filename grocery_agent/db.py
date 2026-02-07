@@ -205,6 +205,12 @@ def recipe_from_row(
     )
 
 
+def delete_recipe(conn: sqlite3.Connection, recipe_id: int) -> bool:
+    """Delete a recipe and its ingredients (CASCADE). Returns True if recipe existed."""
+    cur = conn.execute("DELETE FROM recipes WHERE id = ?", (recipe_id,))
+    return cur.rowcount > 0
+
+
 def list_recipes(conn: sqlite3.Connection) -> list[dict]:
     """Return all saved recipes as [{id, name, portions, image_url?}, ...] for the grocery-list picker."""
     rows = conn.execute(

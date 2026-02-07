@@ -85,6 +85,7 @@ async def get_grocery_list(
     flat = flat_ingredients(recipes)
     canonical_list = await normalize_ingredients_with_llm(flat)
     merged = merge_flat_ingredients(flat, canonical_list)
+    # When checklist is used: include only items that were checked (unchecked are omitted).
     if selected_indices is not None:
         selected_set = set(selected_indices)
         merged = [m for m in merged if m["index"] in selected_set]

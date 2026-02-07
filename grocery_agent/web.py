@@ -13,6 +13,7 @@ import httpx
 
 from grocery_agent.aggregate import flat_ingredients, merge_flat_ingredients
 from grocery_agent.db import (
+    delete_recipe,
     get_connection,
     init_db,
     insert_recipe,
@@ -235,6 +236,7 @@ async def list_confirm(request: Request, recipe_ids: str = Form("")):
     form = await request.form()
     ids_str = (recipe_ids or "").strip()
     recipe_id_list = [int(x.strip()) for x in ids_str.split(",") if x.strip()]
+    # Only checked checkboxes are submitted; unchecked ones are omitted from the form.
     raw = form.getlist("item_index")
     selected_indices = [int(x) for x in raw if x is not None and str(x).strip().isdigit()]
     portions_override = {}
@@ -251,7 +253,22 @@ async def list_confirm(request: Request, recipe_ids: str = Form("")):
 
     from grocery_agent.grocery_list import get_grocery_list, write_grocery_list
 
+    # Recipe items: only those whose checkbox was checked (selected_indices).
     items = await get_grocery_list(recipe_id_list, portions_override or None, selected_indices)
+    # Append manual extra items from the textarea (one per line).
+    extra_raw = form.get("extra_items") or ""
+    for line in extra_raw.splitlines():
+        name = line.strip()
+        if name:
+            items.append({
+                "name": name,
+                "amount_str": "",
+                "form": "other",
+                "category": "other",
+                "optional": False,
+                "pantry_item": False,
+                "source": "manual",
+            })
     write_grocery_list(items)
 
     project_root = Path(__file__).resolve().parent.parent
@@ -411,6 +428,9 @@ async def recipe_edit_submit(
     portions = max(0.25, float(portions))
     ingredients = []
     for i in range(ingredient_count):
+        # Skip ingredients marked for deletion
+        if form.get(f"ingredient_{i}_delete") == "1":
+            continue
         iname = form.get(f"ingredient_{i}_name")
         if iname is None or not str(iname).strip():
             continue
@@ -438,6 +458,25 @@ async def recipe_edit_submit(
         ok = update_recipe(conn, recipe_id, name, portions, instructions, source_url)
         if ok:
             replace_recipe_ingredients(conn, recipe_id, ingredients)
+        conn.commit()
+    finally:
+        conn.close()
+    if not ok:
+        conn = get_connection()
+        try:
+            recipes = list_recipes(conn)
+        finally:
+            conn.close()
+        return _home_response(request, recipes, f"Recipe {recipe_id} not found.")
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.post("/recipe/{recipe_id}/delete", response_class=HTMLResponse)
+async def recipe_delete(request: Request, recipe_id: int):
+    """Delete a recipe and redirect home."""
+    conn = get_connection()
+    try:
+        ok = delete_recipe(conn, recipe_id)
         conn.commit()
     finally:
         conn.close()

@@ -27,6 +27,7 @@
         <span class="ingredient-header">Form</span>
         <span class="ingredient-header ingredient-header-opt">Opt</span>
         <span class="ingredient-header ingredient-header-pantry">Pantry</span>
+        <span class="ingredient-header ingredient-header-delete">Del</span>
         {% for i in range(ingredient_count) %}
         <input type="text" class="name" name="ingredient_{{ i }}_name" placeholder="Name" value="{{ recipe.ingredients[i].name if i < recipe.ingredients | length else '' }}">
         <input type="number" class="qty" name="ingredient_{{ i }}_qty" placeholder="–" step="any" min="0" value="{{ recipe.ingredients[i].quantity_per_portion if i < recipe.ingredients | length and recipe.ingredients[i].quantity_per_portion is not none else '' }}">
@@ -45,15 +46,22 @@
         </select>
         <label class="cell-opt"><input type="checkbox" name="ingredient_{{ i }}_optional" value="1" {{ 'checked' if i < recipe.ingredients | length and recipe.ingredients[i].optional else '' }}> opt</label>
         <label class="cell-pantry"><input type="checkbox" name="ingredient_{{ i }}_pantry" value="1" {{ 'checked' if i < recipe.ingredients | length and recipe.ingredients[i].pantry_item else '' }}> pantry</label>
+        <label class="cell-delete"><input type="checkbox" name="ingredient_{{ i }}_delete" value="1"> del</label>
         {% endfor %}
       </div>
     </div>
     <input type="hidden" name="ingredient_count" value="{{ ingredient_count }}">
 
-    <div style="display: flex; gap: 0.75rem; align-items: center; margin-top: 1.25rem;">
-      <button type="submit">Save</button>
-      <a href="/">Cancel</a>
+    <div style="display: flex; gap: 0.75rem; align-items: center; justify-content: space-between; margin-top: 1.25rem;">
+      <div style="display: flex; gap: 0.75rem; align-items: center;">
+        <button type="submit">Save</button>
+        <a href="/">Cancel</a>
+      </div>
     </div>
+  </form>
+
+  <form method="post" action="/recipe/{{ recipe_id }}/delete" style="margin-top: 1rem; display: flex; justify-content: flex-end;" onsubmit="return confirm('Are you sure you want to delete this recipe? This cannot be undone.');">
+    <button type="submit" class="btn-delete">Delete</button>
   </form>
 {% endblock %}
 
@@ -61,7 +69,7 @@
   <style>
     .ingredients-grid {
       display: grid;
-      grid-template-columns: minmax(160px, 2fr) minmax(9ch, 11ch) minmax(60px, 1fr) minmax(80px, 1fr) minmax(70px, 1fr) auto auto;
+      grid-template-columns: minmax(160px, 2fr) minmax(9ch, 11ch) minmax(60px, 1fr) minmax(80px, 1fr) minmax(70px, 1fr) auto auto auto;
       gap: 0.5rem 0.75rem;
       align-items: center;
     }
@@ -73,7 +81,8 @@
       border-bottom: var(--pixel) solid var(--border);
     }
     .ingredient-header-opt,
-    .ingredient-header-pantry {
+    .ingredient-header-pantry,
+    .ingredient-header-delete {
       padding-left: 0.5rem;
       padding-right: 0.5rem;
     }
@@ -81,7 +90,8 @@
     .ingredients-grid .name { min-width: 0; }
     .ingredients-grid .qty { min-width: 9ch; width: 100%; }
     .ingredients-grid .cell-opt,
-    .ingredients-grid .cell-pantry {
+    .ingredients-grid .cell-pantry,
+    .ingredients-grid .cell-delete {
       margin: 0;
       display: flex;
       align-items: center;
@@ -91,9 +101,25 @@
       min-height: 2.25rem;
     }
     .ingredients-grid .cell-opt input,
-    .ingredients-grid .cell-pantry input { margin: 0; }
-    .ingredients-grid > *:nth-child(14n+8), .ingredients-grid > *:nth-child(14n+9), .ingredients-grid > *:nth-child(14n+10),
-    .ingredients-grid > *:nth-child(14n+11), .ingredients-grid > *:nth-child(14n+12), .ingredients-grid > *:nth-child(14n+13),
-    .ingredients-grid > *:nth-child(14n+14) { background: var(--bg); border-radius: var(--radius); }
+    .ingredients-grid .cell-pantry input,
+    .ingredients-grid .cell-delete input { margin: 0; }
+    .ingredients-grid .cell-delete input { accent-color: #dc2626; }
+    .ingredients-grid > *:nth-child(16n+9), .ingredients-grid > *:nth-child(16n+10), .ingredients-grid > *:nth-child(16n+11),
+    .ingredients-grid > *:nth-child(16n+12), .ingredients-grid > *:nth-child(16n+13), .ingredients-grid > *:nth-child(16n+14),
+    .ingredients-grid > *:nth-child(16n+15), .ingredients-grid > *:nth-child(16n+16) { background: var(--bg); border-radius: var(--radius); }
+    .btn-delete {
+      background: #dc2626;
+      color: #fff;
+      border-color: var(--border);
+    }
+    .btn-delete:hover {
+      background: #b91c1c;
+      transform: translate(1px, 1px);
+      box-shadow: 2px 2px 0 var(--border);
+    }
+    .btn-delete:active {
+      transform: translate(2px, 2px);
+      box-shadow: none;
+    }
   </style>
 {% endblock %}

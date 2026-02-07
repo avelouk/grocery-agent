@@ -1,27 +1,69 @@
 {% extends "base.html" %}
 {% block title %}Grocery list – Grocery Agent{% endblock %}
+{% block head %}
+  <style>
+    .checklist-list { list-style: none; padding: 0; margin: 0; }
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      padding: 0.35rem 0.6rem;
+      margin-bottom: 0.25rem;
+      background: var(--surface);
+      border: var(--pixel) solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 2px 2px 0 var(--border);
+      font-size: 0.95rem;
+      border-left-width: 4px;
+    }
+    .checklist-item-pantry { border-left-color: #b45309; }
+    .checklist-item-weekly { border-left-color: #059669; }
+    .checklist-item label { margin: 0; min-width: 4.5rem; font-size: inherit; font-weight: 400; }
+    .checklist-item .checklist-name { flex: 1; min-width: 0; }
+    .checklist-item .checklist-meta { font-size: 0.85rem; color: var(--muted); }
+    .checklist-extra {
+      margin-top: 1.25rem;
+      padding-top: 1rem;
+      border-top: 2px solid var(--border);
+    }
+    .checklist-extra label { font-size: 0.95rem; }
+    .checklist-extra input { max-width: 20rem; }
+    .checklist-extra .extra-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+    .checklist-extra .extra-row input { flex: 1; min-width: 0; }
+  </style>
+{% endblock %}
 {% block content %}
   <nav class="nav"><a href="/">Home</a> · <strong style="color: var(--text);">Checklist</strong></nav>
   <h1>Your grocery list</h1>
   <p class="muted">{% for r in recipes %}{{ r.name }} ({{ r.portions | int }} portions){% if not loop.last %}; {% endif %}{% endfor %}</p>
-  <p class="muted" style="margin-bottom: 1rem;">Check items to order. Pantry items start unchecked.</p>
+  <p class="muted" style="margin-bottom: 0.75rem;">Check items to order. <span style="color: #b45309;">■</span> Pantry (unchecked by default) · <span style="color: #059669;">■</span> Weekly.</p>
 
   <form method="post" action="/list/confirm">
     <input type="hidden" name="recipe_ids" value="{{ recipe_ids | join(',') }}">
     {% for rid, portion in recipe_portions %}
     <input type="hidden" name="portion_{{ rid }}" value="{{ portion }}">
     {% endfor %}
-    <ul style="list-style: none; padding: 0;">
+    <ul class="checklist-list">
       {% for ing in ingredients_display %}
-      <li class="card" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+      <li class="checklist-item checklist-item-{{ 'pantry' if ing.pantry_item else 'weekly' }}">
         <input type="checkbox" name="item_index" value="{{ ing.index }}" id="item_{{ ing.index }}" {{ 'checked' if not ing.pantry_item else '' }}>
-        <label for="item_{{ ing.index }}" style="margin: 0; min-width: 5.5rem;" class="muted amount-label">{{ ing.amount_str }}</label>
-        <span style="flex: 1; min-width: 0;">{{ ing.name }}{% if ing.optional %} <span class="muted" style="font-style: italic;">(optional)</span>{% endif %}</span>
-        <span class="muted" style="font-size: 0.95rem;">{{ ing.category }} · {% if ing.pantry_item %}pantry{% else %}weekly{% endif %}</span>
+        <label for="item_{{ ing.index }}" class="muted">{{ ing.amount_str }}</label>
+        <span class="checklist-name">{{ ing.name }}{% if ing.optional %} <span class="muted" style="font-style: italic;">(optional)</span>{% endif %}</span>
+        <span class="checklist-meta">{{ ing.form }}</span>
+        <span class="checklist-meta">{{ ing.category }}</span>
       </li>
       {% endfor %}
     </ul>
-    <button type="submit" style="margin-top: 0.5rem;">Confirm and add to cart</button>
+
+    <div class="checklist-extra card">
+      <h2 style="margin-top: 0; font-size: 1.1rem;">Add extra items</h2>
+      <p class="muted" style="margin-bottom: 0.5rem;">Add any other items you want on the list (one per line). Leave empty to skip.</p>
+      <label for="extra_items">Extra items</label>
+      <textarea id="extra_items" name="extra_items" rows="4" placeholder="e.g.&#10;dish soap&#10;paper towels&#10;bread" style="margin-top: 0.25rem;"></textarea>
+    </div>
+
+    <button type="submit" style="margin-top: 0.75rem;">Confirm and add to cart</button>
   </form>
   <p style="margin-top: 1.25rem;"><a href="/">Change recipes</a></p>
 {% endblock %}
