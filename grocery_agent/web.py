@@ -272,9 +272,8 @@ async def list_confirm(request: Request, recipe_ids: str = Form("")):
     write_grocery_list(items)
 
     project_root = Path(__file__).resolve().parent.parent
-    # Let stdout/stderr inherit so run_jumbo logs appear in the same terminal as the web server.
     subprocess.Popen(
-        [sys.executable, str(project_root / "run_jumbo.py")],
+        [sys.executable, "-m", "grocery_agent.jumbo"],
         cwd=str(project_root),
         stdin=subprocess.DEVNULL,
     )

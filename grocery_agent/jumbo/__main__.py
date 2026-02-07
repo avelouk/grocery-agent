@@ -1,12 +1,4 @@
-"""
-Run the Jumbo browser agent. Delegates to grocery_agent.jumbo.
-
-  uv run run_jumbo.py
-  python -m grocery_agent.jumbo
-
-Grocery list: data/grocery_list.json (written by web app on Confirm).
-LLM: BROWSER_USE_API_KEY or GOOGLE_API_KEY in .env.
-"""
+"""Entry point: python -m grocery_agent.jumbo"""
 import asyncio
 import logging
 import sys
@@ -24,10 +16,15 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-if __name__ == "__main__":
+
+def main():
     try:
         llm = get_browser_use_llm()
     except ValueError as e:
         print(e, file=sys.stderr)
         sys.exit(1)
     asyncio.run(run(llm))
+
+
+if __name__ == "__main__":
+    main()
