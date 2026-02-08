@@ -8,6 +8,7 @@ dependencies = [
     "browser-use",
     "fastapi",
     "httpx",
+    "itsdangerous",
     "jinja2",
     "python-dotenv",
     "trafilatura",

@@ -1,3 +1,4 @@
+LICENSE
 README.md
 pyproject.toml
 run_jumbo.py
@@ -18,3 +19,8 @@ grocery_agent.egg-info/dependency_links.txt
 grocery_agent.egg-info/entry_points.txt
 grocery_agent.egg-info/requires.txt
 grocery_agent.egg-info/top_level.txt
+grocery_agent/jumbo/__init__.py
+grocery_agent/jumbo/__main__.py
+grocery_agent/jumbo/config.py
+grocery_agent/jumbo/prompts.py
+grocery_agent/jumbo/runner.py

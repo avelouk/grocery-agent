@@ -1,11 +1,14 @@
 """
 Small web UI: paste recipe or URL → LLM → save to SQLite → show recipe.
 """
+import os
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request
+from starlette.middleware.sessions import SessionMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -17,9 +20,11 @@ from grocery_agent.db import (
     get_connection,
     init_db,
     insert_recipe,
+    list_household_items,
     list_recipes,
     recipe_from_row,
     replace_recipe_ingredients,
+    update_household_last_purchased,
     update_recipe,
 )
 from grocery_agent.fetch import fetch_recipe_image_url, fetch_recipe_text
@@ -31,6 +36,10 @@ from grocery_agent.recipe import parse_recipe
 init_db()
 
 app = FastAPI(title="Grocery Agent")
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ.get("SESSION_SECRET", "dev-secret-change-in-production"),
+)
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
@@ -195,6 +204,89 @@ async def checklist_page(request: Request, ids: str = ""):
     )
 
 
+def _household_urgency(last_purchased: str | None, typical_days: int, today: date) -> tuple[int, float, str]:
+    """Return (days_since_purchase, ratio 0..1+, urgency_class). last_purchased ISO or None (treated as today)."""
+    if last_purchased:
+        try:
+            ref = date.fromisoformat(last_purchased[:10])
+        except (ValueError, TypeError):
+            ref = today
+    else:
+        ref = today
+    days_since = max(0, (today - ref).days)
+    ratio = days_since / typical_days if typical_days else 0
+    if ratio < 0.5:
+        urgency_class = "green"
+    elif ratio < 0.8:
+        urgency_class = "yellow"
+    else:
+        urgency_class = "red"
+    return days_since, ratio, urgency_class
+
+
+@app.post("/list/household", response_class=HTMLResponse)
+async def list_household_post(request: Request):
+    """Save checklist state to session and redirect to household checklist."""
+    form = await request.form()
+    ids_str = (form.get("recipe_ids") or "").strip()
+    recipe_id_list = [int(x.strip()) for x in ids_str.split(",") if x.strip()]
+    raw = form.getlist("item_index")
+    selected_indices = [int(x) for x in raw if x is not None and str(x).strip().isdigit()]
+    portions_override = {}
+    for rid in recipe_id_list:
+        val = form.get(f"portion_{rid}")
+        if val is not None and str(val).strip():
+            try:
+                portions_override[rid] = max(1, int(float(str(val).strip())))
+            except (ValueError, TypeError):
+                pass
+    extra_items = (form.get("extra_items") or "").strip()
+    request.session["pending_recipe_ids"] = recipe_id_list
+    request.session["pending_portions"] = portions_override
+    request.session["pending_selected_indices"] = selected_indices
+    request.session["pending_extra_items"] = extra_items
+    return RedirectResponse(url="/list/household", status_code=303)
+
+
+@app.get("/list/household", response_class=HTMLResponse)
+async def list_household_page(request: Request):
+    """Household (non-food) items checklist. Requires pending session from previous step."""
+    pending = request.session.get("pending_recipe_ids")
+    if not pending:
+        return RedirectResponse(url="/", status_code=302)
+    conn = get_connection()
+    try:
+        rows = list_household_items(conn)
+    finally:
+        conn.close()
+    today = date.today()
+    today_iso = today.isoformat()
+    display = []
+    for r in rows:
+        days_since, ratio, urgency_class = _household_urgency(
+            r.get("last_purchased_date"), r.get("typical_duration_days") or 90, today
+        )
+        display.append({
+            "id": r["id"],
+            "name": r["name"],
+            "typical_duration_days": r["typical_duration_days"],
+            "days_since_purchase": days_since,
+            "ratio": round(ratio, 2),
+            "urgency_class": urgency_class,
+            "running_low": ratio >= 0.8,
+        })
+    # Sort by ratio descending so "likely running low" appear first
+    display.sort(key=lambda x: (-x["ratio"], x["name"]))
+    return templates.TemplateResponse(
+        "household.html",
+        {
+            "request": request,
+            "household_items": display,
+            "recipe_ids_str": ",".join(map(str, pending)),
+        },
+    )
+
+
 @app.get("/api/grocery-list")
 async def api_grocery_list(
     request: Request,
@@ -229,34 +321,26 @@ async def api_grocery_list(
 
 
 @app.post("/list/confirm", response_class=HTMLResponse)
-async def list_confirm(request: Request, recipe_ids: str = Form("")):
+async def list_confirm(request: Request):
     """
-    User confirmed. Build grocery list, write to data/grocery_list.json, start jumbo bot.
+    User confirmed (after household step). Build grocery list from session + household selection, write, start jumbo.
     """
     form = await request.form()
-    ids_str = (recipe_ids or "").strip()
-    recipe_id_list = [int(x.strip()) for x in ids_str.split(",") if x.strip()]
-    # Only checked checkboxes are submitted; unchecked ones are omitted from the form.
-    raw = form.getlist("item_index")
-    selected_indices = [int(x) for x in raw if x is not None and str(x).strip().isdigit()]
-    portions_override = {}
-    for rid in recipe_id_list:
-        val = form.get(f"portion_{rid}")
-        if val is not None and str(val).strip():
-            try:
-                portions_override[rid] = max(1, int(float(str(val).strip())))
-            except (ValueError, TypeError):
-                pass
-    portions_qs = "&".join(
-        f"portion_{rid}={form.get(f'portion_{rid}')}" for rid in recipe_id_list if form.get(f"portion_{rid}") is not None
-    )
+    # Recipe data comes from session (set when they continued from ingredient checklist).
+    recipe_id_list = request.session.get("pending_recipe_ids") or []
+    portions_override = request.session.get("pending_portions") or {}
+    selected_indices = request.session.get("pending_selected_indices") or []
+    extra_raw = request.session.get("pending_extra_items") or ""
+
+    if not recipe_id_list:
+        return RedirectResponse(url="/", status_code=302)
+
+    household_raw = form.getlist("household_item_id")
+    household_ids = [int(x) for x in household_raw if x is not None and str(x).strip().isdigit()]
 
     from grocery_agent.grocery_list import get_grocery_list, write_grocery_list
 
-    # Recipe items: only those whose checkbox was checked (selected_indices).
     items = await get_grocery_list(recipe_id_list, portions_override or None, selected_indices)
-    # Append manual extra items from the textarea (one per line).
-    extra_raw = form.get("extra_items") or ""
     for line in extra_raw.splitlines():
         name = line.strip()
         if name:
@@ -269,7 +353,35 @@ async def list_confirm(request: Request, recipe_ids: str = Form("")):
                 "pantry_item": False,
                 "source": "manual",
             })
+
+    # Append selected household items and update last_purchased.
+    today_iso = date.today().isoformat()
+    conn = get_connection()
+    try:
+        all_household = {r["id"]: r["name"] for r in list_household_items(conn)}
+        for iid in household_ids:
+            name = all_household.get(iid)
+            if name:
+                items.append({
+                    "name": name,
+                    "amount_str": "",
+                    "form": "other",
+                    "category": "other",
+                    "optional": False,
+                    "pantry_item": False,
+                    "source": "household",
+                })
+        update_household_last_purchased(conn, household_ids, today_iso)
+        conn.commit()
+    finally:
+        conn.close()
+
+    # Clear pending session so next time they start fresh.
+    for key in ("pending_recipe_ids", "pending_portions", "pending_selected_indices", "pending_extra_items"):
+        request.session.pop(key, None)
+
     write_grocery_list(items)
+    portions_qs = "&".join(f"portion_{rid}={portions_override.get(rid)}" for rid in recipe_id_list if portions_override.get(rid))
 
     project_root = Path(__file__).resolve().parent.parent
     subprocess.Popen(
@@ -286,6 +398,7 @@ async def list_confirm(request: Request, recipe_ids: str = Form("")):
             "recipe_ids_str": ",".join(map(str, recipe_id_list)),
             "portions_qs": portions_qs,
             "selected_count": len(selected_indices),
+            "household_count": len(household_ids),
             "message": "Bot started. Check the browser window.",
         },
     )

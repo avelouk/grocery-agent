@@ -1,8 +1,9 @@
 """
-SQLite DB for recipes and recipe ingredients.
+SQLite DB for recipes, recipe ingredients, and household (non-food) items.
 Single init script creates tables; no migrations for MVP.
 """
 import sqlite3
+from datetime import date
 from pathlib import Path
 from typing import Optional
 
@@ -23,18 +24,20 @@ def get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
 
 
 def init_db(conn: Optional[sqlite3.Connection] = None, db_path: Optional[Path] = None) -> None:
-    """Create recipes and recipe_ingredients tables if they do not exist."""
+    """Create recipes, recipe_ingredients, and household_items tables if they do not exist."""
     if conn is None:
         conn = get_connection(db_path)
         try:
             _create_tables(conn)
             _ensure_image_url_column(conn)
+            _seed_household_items(conn)
             conn.commit()
         finally:
             conn.close()
     else:
         _create_tables(conn)
         _ensure_image_url_column(conn)
+        _seed_household_items(conn)
 
 
 def _create_tables(conn: sqlite3.Connection) -> None:
@@ -64,12 +67,75 @@ def _create_tables(conn: sqlite3.Connection) -> None:
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe_id ON recipe_ingredients(recipe_id)")
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS household_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            typical_duration_days INTEGER NOT NULL DEFAULT 90,
+            last_purchased_date TEXT,
+            sort_order INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+
 
 def _ensure_image_url_column(conn: sqlite3.Connection) -> None:
     """Add image_url column to recipes if missing (for existing DBs)."""
     cols = [row[1] for row in conn.execute("PRAGMA table_info(recipes)").fetchall()]
     if "image_url" not in cols:
         conn.execute("ALTER TABLE recipes ADD COLUMN image_url TEXT")
+
+
+# Default household items: (name, typical_duration_days). New items appended here are added to existing DBs on startup.
+DEFAULT_HOUSEHOLD_ITEMS = [
+    ("Dish soap", 90),
+    ("Hand soap", 60),
+    ("Paper towels", 30),
+    ("Toilet paper", 21),
+    ("Sponges", 60),
+    ("Trash bags", 45),
+    ("Laundry detergent", 90),
+    ("Fabric softener", 90),
+    ("Dishwasher pods", 60),
+    ("Dishwasher salt", 90),
+    ("Rinse aid", 90),
+    ("Aluminum foil", 120),
+    ("Plastic wrap", 120),
+    ("Baking paper", 120),
+    ("Ziploc / food bags", 60),
+    ("Wet wipes", 30),
+    ("Diapers", 14),
+    ("Toothpaste", 60),
+    ("Body wash", 90),
+    ("Shampoo", 90),
+    ("Conditioner", 90),
+    ("Deodorant", 60),
+    ("All-purpose spray", 60),
+    ("Glass cleaner", 60),
+    ("Floor cleaner", 90),
+    ("Batteries", 180),
+    ("Light bulbs", 365),
+    ("Tissues", 21),
+    ("Hand cream / lotion", 90),
+    ("Sunscreen", 120),
+    ("Cotton swabs", 60),
+]
+
+
+def _seed_household_items(conn: sqlite3.Connection) -> None:
+    """Insert default household items. Adds any from DEFAULT_HOUSEHOLD_ITEMS that are not yet in the table."""
+    existing = {row[0] for row in conn.execute("SELECT name FROM household_items").fetchall()}
+    max_order = 0
+    r = conn.execute("SELECT MAX(sort_order) FROM household_items").fetchone()
+    if r and r[0] is not None:
+        max_order = r[0] + 1
+    for i, (name, days) in enumerate(DEFAULT_HOUSEHOLD_ITEMS):
+        if name in existing:
+            continue
+        conn.execute(
+            "INSERT INTO household_items (name, typical_duration_days, sort_order) VALUES (?, ?, ?)",
+            (name, days, max_order),
+        )
+        max_order += 1
 
 
 def insert_recipe(conn: sqlite3.Connection, recipe: Recipe) -> int:
@@ -209,6 +275,29 @@ def delete_recipe(conn: sqlite3.Connection, recipe_id: int) -> bool:
     """Delete a recipe and its ingredients (CASCADE). Returns True if recipe existed."""
     cur = conn.execute("DELETE FROM recipes WHERE id = ?", (recipe_id,))
     return cur.rowcount > 0
+
+
+def list_household_items(conn: sqlite3.Connection) -> list[dict]:
+    """Return all household items with id, name, typical_duration_days, last_purchased_date (ISO or None), sort_order."""
+    rows = conn.execute(
+        "SELECT id, name, typical_duration_days, last_purchased_date, sort_order FROM household_items ORDER BY sort_order, name"
+    ).fetchall()
+    return [
+        {
+            "id": r["id"],
+            "name": r["name"],
+            "typical_duration_days": r["typical_duration_days"] or 90,
+            "last_purchased_date": r["last_purchased_date"],
+            "sort_order": r["sort_order"] or 0,
+        }
+        for r in rows
+    ]
+
+
+def update_household_last_purchased(conn: sqlite3.Connection, item_ids: list[int], purchased_date: str) -> None:
+    """Set last_purchased_date to purchased_date (ISO) for the given household item ids."""
+    for iid in item_ids:
+        conn.execute("UPDATE household_items SET last_purchased_date = ? WHERE id = ?", (purchased_date, iid))
 
 
 def list_recipes(conn: sqlite3.Connection) -> list[dict]:

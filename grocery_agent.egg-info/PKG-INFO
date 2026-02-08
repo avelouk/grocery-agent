@@ -4,13 +4,16 @@ Version: 1.0.0
 Summary: Grocery agent: recipe ingest, pantry, jumbo.cl cart
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
+License-File: LICENSE
 Requires-Dist: browser-use
 Requires-Dist: fastapi
 Requires-Dist: httpx
+Requires-Dist: itsdangerous
 Requires-Dist: jinja2
 Requires-Dist: python-dotenv
 Requires-Dist: trafilatura
 Requires-Dist: uvicorn[standard]
+Dynamic: license-file
 
 # Grocery agent
 
@@ -35,9 +38,9 @@ uvx browser-use install     # for jumbo cart
 
 | What | Env var | Notes |
 |------|---------|--------|
-| Jumbo login | `JUMBO_EMAIL`, `JUMBO_PASSWORD` | Required for run_jumbo |
+| Jumbo login | `JUMBO_EMAIL`, `JUMBO_PASSWORD` | Required for the jumbo bot. |
 | Web app (recipes, grocery list) | `GOOGLE_API_KEY` | [Get key](https://aistudio.google.com/app/apikey). Used for structured output. |
-| Jumbo browser agent | `BROWSER_USE_API_KEY` | [Get key](https://cloud.browser-use.com/new-api-key). Preferred for run_jumbo; falls back to Google if unset. |
+| Jumbo browser agent | `BROWSER_USE_API_KEY` | [Get key](https://cloud.browser-use.com/new-api-key). Preferred for the jumbo bot; falls back to Google if unset. |
 | Custom browser | `BROWSER_EXECUTABLE_PATH` | Optional. Default: auto-detect Chromium on macOS. |
 
 **TL;DR:** Set `GOOGLE_API_KEY` for the web app. Set `BROWSER_USE_API_KEY` (or `GOOGLE_API_KEY`) for the jumbo bot. Set both for full flow.
@@ -58,9 +61,11 @@ Open http://localhost:8000. Ingest recipes (paste text or URL), then use **Groce
 
 ```bash
 uv run run_jumbo.py
+# or
+uv run python -m grocery_agent.jumbo
 ```
 
-Browser opens on jumbo.cl; agent logs in and runs the task. With a list from the web app, it reads `data/grocery_list.json`.
+Browser opens on jumbo.cl; agent logs in and runs the task. With a list from the web app, it reads `data/grocery_list.json`. The bot lives in `grocery_agent.jumbo` (prompts, config, runner); `run_jumbo.py` is a thin entry point.
 
 ---
 
